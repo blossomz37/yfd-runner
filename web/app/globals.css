@@ -204,9 +204,16 @@ textarea {
 .page-title {
   margin: 10px 0 8px;
   font-family: "Iowan Old Style", "Palatino Linotype", serif;
-  font-size: clamp(2rem, 4vw, 3.4rem);
   line-height: 0.95;
   letter-spacing: -0.03em;
+}
+
+.hero-title {
+  font-size: clamp(1.85rem, 2.8vw, 2.5rem);
+}
+
+.page-title {
+  font-size: clamp(1.55rem, 2.2vw, 2.1rem);
 }
 
 .hero-copy,
