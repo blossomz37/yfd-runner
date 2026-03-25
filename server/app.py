@@ -29,6 +29,33 @@ class CreateRunRequest(BaseModel):
     review_policy: dict[str, str] | None = None
 
 
+class BranchRunRequest(BaseModel):
+    new_run_id: str
+    branched_from_chapter: int | None = None
+    branch_note: str = ""
+
+
+class StepSettingsUpdateRequest(BaseModel):
+    model_config_name: str | None = Field(default=None, alias="model_config")
+    max_tokens: int | None = None
+    temperature: float | None = None
+    extras: dict[str, object] | None = None
+
+
+class DossierBlockRequest(BaseModel):
+    label: str
+    source_type: str
+    source_name: str
+    text: str
+
+
+class CreateProjectFromDossierRequest(BaseModel):
+    run_id: str
+    blocks: list[DossierBlockRequest]
+    model_config_name: str | None = Field(default=None, alias="model_config")
+    output_dir: str | None = None
+
+
 class ChapterAutoRunRequest(BaseModel):
     model_config_name: str | None = Field(default=None, alias="model_config")
     force: bool = False
@@ -109,10 +136,31 @@ def get_config() -> dict[str, object]:
     return runner_bridge.get_config()
 
 
+@app.get("/api/step-settings")
+def get_step_settings() -> dict[str, object]:
+    return runner_bridge.get_step_settings()
+
+
 @app.put("/api/config")
 def put_config(request: FileUpdateRequest) -> dict[str, object]:
     try:
         return runner_bridge.update_config(request.content)
+    except runner_bridge.BridgeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.put("/api/step-settings/{step}")
+def put_step_settings(step: str, request: StepSettingsUpdateRequest) -> dict[str, object]:
+    try:
+        return runner_bridge.update_step_settings(
+            step=step,
+            model_config=request.model_config_name,
+            max_tokens=request.max_tokens,
+            temperature=request.temperature,
+            extras=request.extras,
+        )
+    except runner_bridge.ValidationBridgeError as exc:
+        return JSONResponse(status_code=400, content={"status": "validation_error", "errors": exc.errors})
     except runner_bridge.BridgeError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -173,6 +221,36 @@ def create_run(request: CreateRunRequest):
             model_config=request.model_config_name,
             output_dir=request.output_dir,
             review_policy=request.review_policy,
+        )
+    except runner_bridge.ValidationBridgeError as exc:
+        return JSONResponse(status_code=400, content={"status": "validation_error", "errors": exc.errors})
+    except runner_bridge.BridgeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/projects/from-dossier")
+def create_project_from_dossier(request: CreateProjectFromDossierRequest) -> dict[str, object]:
+    try:
+        return runner_bridge.create_project_from_dossier(
+            run_id=request.run_id,
+            blocks=[block.model_dump() for block in request.blocks],
+            model_config=request.model_config_name,
+            output_dir=request.output_dir,
+        )
+    except runner_bridge.ValidationBridgeError as exc:
+        return JSONResponse(status_code=400, content={"status": "validation_error", "errors": exc.errors})
+    except runner_bridge.BridgeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/runs/{run_id}/branch")
+def branch_run(run_id: str, request: BranchRunRequest) -> dict[str, object]:
+    try:
+        return runner_bridge.branch_run(
+            run_id=run_id,
+            new_run_id=request.new_run_id,
+            branched_from_chapter=request.branched_from_chapter,
+            branch_note=request.branch_note,
         )
     except runner_bridge.ValidationBridgeError as exc:
         return JSONResponse(status_code=400, content={"status": "validation_error", "errors": exc.errors})

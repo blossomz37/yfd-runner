@@ -207,6 +207,16 @@ def call_step(
     last_error: Exception | None = None
 
     for attempt in range(1, total_attempts + 1):
+        _log_attempt(
+            attempt_logger,
+            run_id=run_id,
+            chapter=chapter,
+            step=normalize_step_name(step_name),
+            model=selected_name,
+            attempt=attempt,
+            status="started",
+            estimated_prompt_tokens=estimated_prompt_tokens,
+        )
         try:
             response = post_chat_completion(prompt, model_config, base_url, api_key, timeout=timeout)
             response_text = _extract_response_text(response).strip()

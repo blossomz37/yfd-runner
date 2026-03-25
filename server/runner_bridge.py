@@ -67,6 +67,27 @@ DEFAULT_REVIEW_POLICY = {
     "final": "manual",
     "summary": "auto",
 }
+REVIEW_POLICIES = {"auto", "manual", "on_warning"}
+STEP_SETTINGS_ORDER = ["cascade", "plan", "draft", "repetition", "style", "craft", "final", "summary"]
+DOSSIER_LABEL_DEFAULTS = {
+    "brain_dump": ["section_1.required_data_layer"],
+    "synopsis": ["section_2.story_concept"],
+    "character_notes": ["section_3.protagonist_operating_systems"],
+    "supporting_cast": ["section_4.supporting_cast"],
+    "world_notes": ["section_5.story_world"],
+    "style_notes": ["section_8.writing_style_rules"],
+    "genre_notes": ["section_9.genre_lens"],
+    "beat_sheet": ["chapter_outline_inputs"],
+}
+DOSSIER_TARGET_SECTIONS = {
+    "section_2.story_concept": "section_2_story_concept",
+    "section_3.protagonist_operating_systems": "section_3_protagonist_operating_systems",
+    "section_4.supporting_cast": "section_4_supporting_cast",
+    "section_5.story_world": "section_5_story_world",
+    "section_8.writing_style_rules": "section_8_writing_style_rules",
+    "section_9.genre_lens": "section_9_genre_lens",
+    "chapter_outline_inputs": "section_12_chapter_outlines_setup",
+}
 
 
 def _validate_relative_name(name: str, suffix: str) -> str:
@@ -305,6 +326,117 @@ def update_config(content: str) -> dict[str, Any]:
     normalized = _normalize_text_file(content)
     _write_text_atomic(runner_state.CONFIG_PATH, normalized)
     return get_config()
+
+
+def _canonical_step_settings_name(step: str) -> str:
+    normalized = step.strip().lower().replace("-", "_")
+    aliases = {
+        "repetition_audit": "repetition",
+        "edit_style": "style",
+        "edit_craft": "craft",
+    }
+    canonical = aliases.get(normalized, normalized)
+    if canonical not in STEP_SETTINGS_ORDER:
+        raise ValidationBridgeError(
+            [{"code": "step_invalid", "message": f"Unsupported step: {step}"}]
+        )
+    return canonical
+
+
+def _step_settings_payload(config: dict[str, Any], step: str) -> dict[str, Any]:
+    canonical = _canonical_step_settings_name(step)
+    project = config.get("project", {}) if isinstance(config.get("project", {}), dict) else {}
+    default_model = project.get("default_model_config", "default")
+    step_models = config.get("step_models", {}) if isinstance(config.get("step_models", {}), dict) else {}
+    step_overrides = config.get("step_overrides", {}) if isinstance(config.get("step_overrides", {}), dict) else {}
+    overrides = step_overrides.get(canonical, {})
+    if not isinstance(overrides, dict):
+        overrides = {}
+
+    extras = {
+        key: copy.deepcopy(value)
+        for key, value in overrides.items()
+        if key not in {"max_tokens", "temperature"}
+    }
+    return {
+        "step": canonical,
+        "model_config": step_models.get(canonical) or default_model,
+        "max_tokens": overrides.get("max_tokens"),
+        "temperature": overrides.get("temperature"),
+        "extras": extras,
+    }
+
+
+def get_step_settings() -> dict[str, Any]:
+    config = runner_state.load_config(runner_state.CONFIG_PATH)
+    return {
+        "steps": {
+            step: _step_settings_payload(config, step)
+            for step in STEP_SETTINGS_ORDER
+        }
+    }
+
+
+def update_step_settings(
+    step: str,
+    *,
+    model_config: str | None = None,
+    max_tokens: int | None = None,
+    temperature: float | None = None,
+    extras: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    canonical = _canonical_step_settings_name(step)
+    if max_tokens is not None and max_tokens <= 0:
+        raise ValidationBridgeError(
+            [{"code": "max_tokens_invalid", "message": "max_tokens must be greater than 0."}]
+        )
+    if temperature is not None and temperature < 0:
+        raise ValidationBridgeError(
+            [{"code": "temperature_invalid", "message": "temperature must be >= 0."}]
+        )
+    if extras is not None and not isinstance(extras, dict):
+        raise ValidationBridgeError(
+            [{"code": "extras_invalid", "message": "extras must be an object if provided."}]
+        )
+
+    config = runner_state.load_config(runner_state.CONFIG_PATH)
+    updated = copy.deepcopy(config)
+    updated.setdefault("step_models", {})
+    updated.setdefault("step_overrides", {})
+    if not isinstance(updated["step_models"], dict) or not isinstance(updated["step_overrides"], dict):
+        raise BridgeError("Config step settings sections are invalid")
+
+    if model_config is not None:
+        normalized_model = model_config.strip()
+        if not normalized_model:
+            raise ValidationBridgeError(
+                [{"code": "model_config_invalid", "message": "model_config must not be empty."}]
+            )
+        updated["step_models"][canonical] = normalized_model
+
+    existing_overrides = updated["step_overrides"].get(canonical, {})
+    if not isinstance(existing_overrides, dict):
+        existing_overrides = {}
+    next_overrides = copy.deepcopy(existing_overrides)
+
+    if max_tokens is not None:
+        next_overrides["max_tokens"] = int(max_tokens)
+    if temperature is not None:
+        next_overrides["temperature"] = float(temperature)
+    if extras is not None:
+        for key in list(next_overrides.keys()):
+            if key not in {"max_tokens", "temperature"}:
+                del next_overrides[key]
+        for key, value in extras.items():
+            if key in {"max_tokens", "temperature"}:
+                continue
+            next_overrides[key] = value
+
+    updated["step_overrides"][canonical] = next_overrides
+    normalized = _normalize_text_file(yaml.safe_dump(updated, sort_keys=False))
+    _write_text_atomic(runner_state.CONFIG_PATH, normalized)
+    latest = runner_state.load_config(runner_state.CONFIG_PATH)
+    return _step_settings_payload(latest, canonical)
 
 
 def _ensure_studio(data: dict[str, Any]) -> dict[str, Any]:
@@ -609,7 +741,156 @@ def _review_policy_for_step(data: dict[str, Any], step: str) -> str:
     review_policy = run_settings.get("review_policy", {})
     if not isinstance(review_policy, dict):
         return DEFAULT_REVIEW_POLICY.get(step, "manual")
-    return str(review_policy.get(step) or DEFAULT_REVIEW_POLICY.get(step, "manual"))
+    policy = str(review_policy.get(step) or DEFAULT_REVIEW_POLICY.get(step, "manual")).strip().lower()
+    if policy not in REVIEW_POLICIES:
+        return DEFAULT_REVIEW_POLICY.get(step, "manual")
+    return policy
+
+
+def _review_checkpoint_for_policy(policy: str, *, warnings_present: bool) -> tuple[bool, str, str]:
+    normalized = policy.strip().lower() or "manual"
+    if normalized not in REVIEW_POLICIES:
+        normalized = "manual"
+
+    if normalized == "manual":
+        return True, "policy", "pending"
+    if normalized == "on_warning" and warnings_present:
+        return True, "warning", "pending"
+    return False, "manual", "not_required"
+
+
+def _step_event_fields(
+    *,
+    chapter: int | None = None,
+    step: str | None = None,
+    section_number: int | None = None,
+) -> dict[str, Any]:
+    fields: dict[str, Any] = {}
+    if chapter is not None:
+        fields["chapter"] = chapter
+    if step is not None:
+        fields["step"] = step
+    if section_number is not None:
+        fields["section_number"] = section_number
+    return fields
+
+
+def _append_step_failure_event(
+    job_id: str,
+    message: str,
+    *,
+    chapter: int | None = None,
+    step: str | None = None,
+    section_number: int | None = None,
+) -> None:
+    fields = _step_event_fields(chapter=chapter, step=step, section_number=section_number)
+    if _is_validation_failure_message(message):
+        _append_job_event(job_id, "validation_failed", message, **fields)
+    _append_job_event(job_id, "step_failed", message, **fields)
+
+
+def _call_model_step_with_job_events(
+    *,
+    prompt: str,
+    step_name: str,
+    run_id: str,
+    chapter: int | None,
+    job_id: str,
+    model_config: str | None,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    canonical_step = runner_api.normalize_step_name(step_name)
+    event_fields = _step_event_fields(chapter=chapter, step=canonical_step)
+    warnings: list[dict[str, Any]] = []
+
+    def attempt_logger(payload: dict[str, Any]) -> None:
+        attempt = int(payload.get("attempt") or 0)
+        status = str(payload.get("status") or "")
+        message = f"Attempt {attempt} {status}: {canonical_step}" if attempt else f"Attempt event: {canonical_step}"
+        fields = {
+            **event_fields,
+            "attempt": attempt,
+            "model_config": payload.get("model"),
+            "estimated_prompt_tokens": payload.get("estimated_prompt_tokens"),
+        }
+        if status == "started":
+            _append_job_event(job_id, "attempt_started", f"Attempt {attempt} started: {canonical_step}", **fields)
+        elif status == "success":
+            _append_job_event(job_id, "attempt_succeeded", f"Attempt {attempt} succeeded: {canonical_step}", **fields)
+        elif status == "error":
+            _append_job_event(
+                job_id,
+                "attempt_failed",
+                f"Attempt {attempt} failed: {canonical_step}",
+                error=payload.get("error"),
+                **fields,
+            )
+        else:
+            _append_job_event(job_id, "attempt_event", message, **fields)
+
+    result = runner_api.call_step(
+        prompt,
+        canonical_step,
+        run_id=run_id,
+        chapter=chapter,
+        cli_model_config=model_config,
+        attempt_logger=attempt_logger,
+    )
+
+    if canonical_step != "cascade":
+        config = runner_state.load_config()
+        steps_config = config.get("steps", {}) if isinstance(config.get("steps", {}), dict) else {}
+        warn_context_tokens = int(steps_config.get("warn_context_tokens", 0))
+        estimated_prompt_tokens = int(result.get("estimated_prompt_tokens") or 0)
+        if warn_context_tokens and estimated_prompt_tokens > warn_context_tokens:
+            warning = {
+                "code": "prompt_tokens_high",
+                "message": (
+                    f"Estimated prompt tokens for step '{canonical_step}' are {estimated_prompt_tokens}, "
+                    f"which exceeds warn_context_tokens={warn_context_tokens}."
+                ),
+            }
+            warnings.append(warning)
+            _append_job_event(
+                job_id,
+                "warning",
+                warning["message"],
+                warn_context_tokens=warn_context_tokens,
+                estimated_prompt_tokens=estimated_prompt_tokens,
+                **event_fields,
+            )
+
+    attempts = int(result.get("attempts") or 1)
+    if attempts > 1:
+        warning = {
+            "code": "retry_recovered",
+            "message": f"Step '{canonical_step}' succeeded after {attempts} attempts.",
+        }
+        warnings.append(warning)
+        _append_job_event(job_id, "warning", warning["message"], attempt_count=attempts, **event_fields)
+
+    return result, warnings
+
+
+def _save_step_output_and_metrics(
+    run_id: str,
+    chapter: int,
+    step: str,
+    *,
+    content: str,
+    result: dict[str, Any],
+) -> None:
+    runner_state.save_step_output(run_id, chapter, step, content)
+    response = result["response"]
+    runner_metrics.record_call(
+        run_id,
+        chapter,
+        step,
+        result["model_config"]["model"],
+        response,
+        content=content,
+        extra_fields={"attempts": result["attempts"]},
+    )
+    runner_metrics.update_cumulative(_load_run_data(run_id).get("project", "project"), run_id)
 
 
 def _set_review_state(
@@ -787,6 +1068,209 @@ def create_run(
     }
 
 
+def _normalize_dossier_text(text: str) -> str:
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n").strip()
+    normalized = re.sub(r"\n{3,}", "\n\n", normalized)
+    return normalized
+
+
+def _slug_label(label: str) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", "_", label.strip().lower()).strip("_")
+    return normalized or "block"
+
+
+def _dossier_blocks(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    dossier_blocks: list[dict[str, Any]] = []
+    for index, record in enumerate(records, start=1):
+        label = _slug_label(str(record.get("label", "")))
+        normalized_text = _normalize_dossier_text(str(record.get("text", "")))
+        if not normalized_text:
+            continue
+        dossier_blocks.append(
+            {
+                "block_id": f"blk_{index:03d}",
+                "label": label,
+                "source_type": str(record.get("source_type", "")).strip() or "pasted_text",
+                "source_name": str(record.get("source_name", "")).strip() or f"block-{index}",
+                "raw_text": str(record.get("text", "")),
+                "normalized_text": normalized_text,
+                "included": True,
+                "mapping_targets": DOSSIER_LABEL_DEFAULTS.get(label, []),
+                "created_at": runner_state.now_iso(),
+            }
+        )
+    return dossier_blocks
+
+
+def _required_data_layer_from_blocks(dossier_blocks: list[dict[str, Any]]) -> str:
+    mapped = [block for block in dossier_blocks if "section_1.required_data_layer" in block.get("mapping_targets", [])]
+    source_blocks = mapped or dossier_blocks
+    lines: list[str] = []
+    for block in source_blocks:
+        lines.append(f"**{block['label']}:** {block['normalized_text']}")
+    return "\n\n".join(lines).strip()
+
+
+def _worksheet_draft_from_blocks(dossier_blocks: list[dict[str, Any]]) -> str:
+    sections: list[str] = []
+    required_data_layer = _required_data_layer_from_blocks(dossier_blocks)
+    sections.append(
+        "## section_1_required_data_layer\n\n"
+        "### required_data_layer\n\n"
+        f"{required_data_layer}"
+    )
+
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for block in dossier_blocks:
+        for target in block.get("mapping_targets", []):
+            if target == "section_1.required_data_layer":
+                continue
+            grouped.setdefault(target, []).append(block)
+
+    for target, section_key in DOSSIER_TARGET_SECTIONS.items():
+        blocks = grouped.get(target, [])
+        if not blocks:
+            continue
+        body_lines = [
+            f"### imported_{_slug_label(block['label'])}\n\n{block['normalized_text']}"
+            for block in blocks
+        ]
+        sections.append(f"## {section_key}\n\n" + "\n\n".join(body_lines).strip())
+
+    return "\n\n---\n\n".join(section.rstrip() for section in sections).rstrip() + "\n"
+
+
+def create_project_from_dossier(
+    run_id: str,
+    blocks: list[dict[str, Any]],
+    model_config: str | None = None,
+    output_dir: str | None = None,
+) -> dict[str, Any]:
+    target_run_id = run_id.strip()
+    if not target_run_id:
+        raise ValidationBridgeError(
+            [{"code": "run_id_required", "message": "run_id is required."}]
+        )
+    if runner_state.state_path(target_run_id).exists():
+        raise ValidationBridgeError(
+            [{"code": "run_id_exists", "message": f"Run already exists: {target_run_id}"}]
+        )
+
+    dossier_blocks = _dossier_blocks(blocks)
+    if not dossier_blocks:
+        raise ValidationBridgeError(
+            [{"code": "empty_dossier", "message": "At least one non-empty dossier block is required."}]
+        )
+
+    output_path_value: str | None = None
+    if output_dir is not None:
+        output_path_value = str(_require_absolute_path(output_dir, "output_dir"))
+
+    worksheet_draft = _worksheet_draft_from_blocks(dossier_blocks)
+    validation = validate_worksheet_text(worksheet_draft)
+    if not validation["ok"]:
+        raise ValidationBridgeError(validation["errors"])
+
+    config = runner_state.load_config(runner_state.CONFIG_PATH)
+    project = config.get("project", {}) if isinstance(config.get("project", {}), dict) else {}
+    created_at = runner_state.now_iso()
+    state_payload = {
+        "run_id": target_run_id,
+        "project": project.get("name", "project"),
+        "model_config": model_config,
+        "worksheet": worksheet_draft,
+        "instructions": runner_state.extract_required_data_layer(worksheet_draft),
+        "total_chapters": project.get("total_chapters", 0),
+        "chapter_summaries": "",
+        "metrics": runner_state.default_metrics(),
+        "chapters": {},
+        "created_at": created_at,
+        "updated_at": created_at,
+        "studio": {
+            "run_settings": {
+                "output_dir": output_path_value,
+                "review_policy": {},
+                "default_steering_note": "",
+                "created_from": "dossier",
+            },
+            "dossier_blocks": dossier_blocks,
+        },
+    }
+
+    try:
+        runner_state.save_state(target_run_id, state_payload)
+    except Exception as exc:  # pragma: no cover - surfaced through API
+        raise BridgeError(str(exc)) from exc
+
+    return {
+        "run_id": target_run_id,
+        "status": "draft_ready",
+        "dossier_blocks": [
+            {
+                "block_id": block["block_id"],
+                "label": block["label"],
+                "mapping_targets": block["mapping_targets"],
+            }
+            for block in dossier_blocks
+        ],
+        "worksheet_draft": worksheet_draft,
+        "state_path": _display_path(runner_state.state_path(target_run_id)),
+    }
+
+
+def branch_run(
+    run_id: str,
+    new_run_id: str,
+    branched_from_chapter: int | None = None,
+    branch_note: str = "",
+) -> dict[str, Any]:
+    source_data = _load_run_data(run_id)
+    target_run_id = new_run_id.strip()
+    if not target_run_id:
+        raise ValidationBridgeError(
+            [{"code": "new_run_id_required", "message": "new_run_id is required."}]
+        )
+    if target_run_id == run_id:
+        raise ValidationBridgeError(
+            [{"code": "new_run_id_invalid", "message": "new_run_id must differ from the source run id."}]
+        )
+    if runner_state.state_path(target_run_id).exists():
+        raise ValidationBridgeError(
+            [{"code": "run_id_exists", "message": f"Run already exists: {target_run_id}"}]
+        )
+    if branched_from_chapter is not None and branched_from_chapter < 1:
+        raise ValidationBridgeError(
+            [{"code": "branched_from_chapter_invalid", "message": "branched_from_chapter must be >= 1."}]
+        )
+
+    branched = copy.deepcopy(source_data)
+    branched["run_id"] = target_run_id
+    branched["created_at"] = runner_state.now_iso()
+    branched["updated_at"] = branched["created_at"]
+
+    studio = branched.setdefault("studio", {})
+    if not isinstance(studio, dict):
+        raise BridgeError("Run studio state is invalid")
+    studio["branch"] = {
+        "parent_run_id": run_id,
+        "branched_from_chapter": branched_from_chapter,
+        "branch_note": branch_note.strip(),
+        "branched_at": runner_state.now_iso(),
+    }
+
+    try:
+        runner_state.save_state(target_run_id, branched)
+    except Exception as exc:  # pragma: no cover - surfaced through API
+        raise BridgeError(str(exc)) from exc
+
+    return {
+        "run_id": target_run_id,
+        "parent_run_id": run_id,
+        "status": "created",
+        "state_path": _display_path(runner_state.state_path(target_run_id)),
+    }
+
+
 def _execute_step_once(
     run_id: str,
     chapter: int,
@@ -797,16 +1281,68 @@ def _execute_step_once(
     job_id: str,
 ) -> dict[str, Any]:
     storage_step = _storage_step_name(step)
+    manuscript_path: str | None = None
     _raise_if_cancel_requested(job_id)
     _append_job_event(job_id, "step_started", f"Step started: {storage_step}", chapter=chapter, step=storage_step)
-    content = runner_cli.execute_step(run_id, chapter, step, model_config=model_config, force=force)
-    _append_job_event(job_id, "step_succeeded", f"Step succeeded: {storage_step}", chapter=chapter, step=storage_step)
+    try:
+        runner_cli.maybe_prompt_overwrite(run_id, chapter, storage_step, force=force)
+        prompt = runner_renderer.render_step(run_id, chapter, storage_step)
+        _append_job_event(
+            job_id,
+            "prompt_rendered",
+            f"Prompt rendered: {storage_step}",
+            chapter=chapter,
+            step=storage_step,
+            prompt_chars=len(prompt),
+        )
+        result, warnings = _call_model_step_with_job_events(
+            prompt=prompt,
+            step_name=storage_step,
+            run_id=run_id,
+            chapter=chapter,
+            job_id=job_id,
+            model_config=model_config,
+        )
+        response = result["response"]
+        content = _response_text(response).strip()
+        if not content:
+            raise BridgeError("Model returned an empty response body")
+
+        if storage_step in {"draft", "final"}:
+            min_word_count = 500
+            if storage_step == "final":
+                draft_text = runner_state.get_step_output(run_id, chapter, "draft") or ""
+                draft_word_count = runner_validator.count_words(draft_text)
+                if draft_word_count:
+                    min_word_count = max(min_word_count, int(draft_word_count * 0.4))
+
+            ok, reason = runner_validator.check_prose_response(content, min_word_count=min_word_count)
+            if not ok:
+                fail_dir = runner_renderer.RENDERED_DIR / run_id
+                fail_dir.mkdir(parents=True, exist_ok=True)
+                fail_path = fail_dir / f"ch{chapter:02d}_{storage_step}_validation_fail.md"
+                fail_path.write_text(content, encoding="utf-8")
+                raise BridgeError(
+                    f"Step '{storage_step}' produced invalid prose output ({reason}). Saved: {fail_path}"
+                )
+
+        _save_step_output_and_metrics(run_id, chapter, storage_step, content=content, result=result)
+        if storage_step == "summary":
+            _sync_summary_and_manuscript_if_needed(run_id, storage_step)
+            output_dir = _run_output_dir_from_data(_load_run_data(run_id))
+            manuscript_root = output_dir or runner_manuscript.OUTPUT_DIR
+            manuscript_path = _display_path(manuscript_root / f"{run_id}_manuscript.md")
+        _append_job_event(job_id, "step_succeeded", f"Step succeeded: {storage_step}", chapter=chapter, step=storage_step)
+    except Exception as exc:
+        _append_step_failure_event(job_id, str(exc), chapter=chapter, step=storage_step)
+        raise
 
     data = _load_run_data(run_id)
     policy = _review_policy_for_step(data, storage_step)
-    review_required = policy == "manual"
-    review_reason = "policy" if review_required else "manual"
-    review_status = "pending" if review_required else "not_required"
+    review_required, review_reason, review_status = _review_checkpoint_for_policy(
+        policy,
+        warnings_present=bool(warnings),
+    )
     candidate_id = _record_initial_review_checkpoint(
         run_id,
         chapter,
@@ -817,14 +1353,16 @@ def _execute_step_once(
         review_status=review_status,
     )
     if review_required:
+        message = "Review required due to warning" if review_reason == "warning" else f"Manual review required: {storage_step}"
         _append_job_event(
             job_id,
             "warning",
-            f"Manual review required: {storage_step}",
+            message,
             chapter=chapter,
             step=storage_step,
             candidate_id=candidate_id,
             review_policy=policy,
+            warning_count=len(warnings),
         )
 
     return {
@@ -832,6 +1370,8 @@ def _execute_step_once(
         "review_policy": policy,
         "review_required": review_required,
         "candidate_id": candidate_id,
+        "warning_count": len(warnings),
+        "manuscript_path": manuscript_path,
     }
 
 
@@ -858,59 +1398,69 @@ def _run_cascade_section_once(
         section_number=section_number,
         step="cascade",
     )
-    prompt = runner_renderer.render_cascade(run_id, section_number)
-    _append_job_event(
-        job_id,
-        "prompt_rendered",
-        f"Cascade prompt rendered: {target['section_key']}",
-        section_number=section_number,
-        step="cascade",
-    )
-    result = runner_api.call_step(
-        prompt,
-        "cascade",
-        run_id=run_id,
-        cli_model_config=model_config,
-    )
-    response = result["response"]
-    content = _response_text(response).strip()
-    if not content:
-        raise BridgeError("Cascade returned an empty response body")
-
-    if not force:
-        config = runner_state.load_config()
-        cascade_config = config.get("cascade", {})
-        ok, reason = runner_validator.check_cascade_response(
-            content,
-            target["section_key"],
-            bracket_pattern=cascade_config.get("bracket_pattern", runner_validator.DEFAULT_BRACKET_PATTERN),
-            min_response_length=int(cascade_config.get("min_response_length", 50)),
+    try:
+        prompt = runner_renderer.render_cascade(run_id, section_number)
+        _append_job_event(
+            job_id,
+            "prompt_rendered",
+            f"Cascade prompt rendered: {target['section_key']}",
+            section_number=section_number,
+            step="cascade",
+            prompt_chars=len(prompt),
         )
-        if not ok:
-            fail_dir = runner_renderer.RENDERED_DIR / run_id
-            fail_dir.mkdir(parents=True, exist_ok=True)
-            fail_path = fail_dir / f"cascade_fail_section_{section_number:02d}_{target['section_key']}.md"
-            fail_path.write_text(content, encoding="utf-8")
-            raise BridgeError(f"Cascade validation failed for {target['section_key']}: {reason}. Saved: {fail_path}")
+        result, _warnings = _call_model_step_with_job_events(
+            prompt=prompt,
+            step_name="cascade",
+            run_id=run_id,
+            chapter=None,
+            job_id=job_id,
+            model_config=model_config,
+        )
+        response = result["response"]
+        content = _response_text(response).strip()
+        if not content:
+            raise BridgeError("Cascade returned an empty response body")
 
-    runner_state.save_worksheet_section(run_id, target["section_key"], content)
-    runner_metrics.record_call(
-        run_id,
-        None,
-        "cascade",
-        result["model_config"]["model"],
-        response,
-        content=content,
-        extra_fields={"attempts": result["attempts"], "section": target["section_key"]},
-    )
-    runner_metrics.update_cumulative(_load_run_data(run_id).get("project", "project"), run_id)
-    _append_job_event(
-        job_id,
-        "step_succeeded",
-        f"Cascade section completed: {target['section_key']}",
-        section_number=section_number,
-        step="cascade",
-    )
+        if not force:
+            config = runner_state.load_config()
+            cascade_config = config.get("cascade", {})
+            ok, reason = runner_validator.check_cascade_response(
+                content,
+                target["section_key"],
+                bracket_pattern=cascade_config.get("bracket_pattern", runner_validator.DEFAULT_BRACKET_PATTERN),
+                min_response_length=int(cascade_config.get("min_response_length", 50)),
+            )
+            if not ok:
+                fail_dir = runner_renderer.RENDERED_DIR / run_id
+                fail_dir.mkdir(parents=True, exist_ok=True)
+                fail_path = fail_dir / f"cascade_fail_section_{section_number:02d}_{target['section_key']}.md"
+                fail_path.write_text(content, encoding="utf-8")
+                raise BridgeError(
+                    f"Cascade validation failed for {target['section_key']}: {reason}. Saved: {fail_path}"
+                )
+
+        runner_state.save_worksheet_section(run_id, target["section_key"], content)
+        runner_metrics.record_call(
+            run_id,
+            None,
+            "cascade",
+            result["model_config"]["model"],
+            response,
+            content=content,
+            extra_fields={"attempts": result["attempts"], "section": target["section_key"]},
+        )
+        runner_metrics.update_cumulative(_load_run_data(run_id).get("project", "project"), run_id)
+        _append_job_event(
+            job_id,
+            "step_succeeded",
+            f"Cascade section completed: {target['section_key']}",
+            section_number=section_number,
+            step="cascade",
+        )
+    except Exception as exc:
+        _append_step_failure_event(job_id, str(exc), section_number=section_number, step="cascade")
+        raise
+
     return {
         "section_number": section_number,
         "section_key": target["section_key"],
@@ -962,9 +1512,6 @@ def queue_execute_step(
             force=force,
             job_id=job_id,
         )
-        manuscript_path = None
-        if step_result["step"] == "summary":
-            manuscript_path = _display_path(_build_manuscript_for_run(run_id))
         return {
             "run_id": run_id,
             "chapter": chapter,
@@ -972,7 +1519,7 @@ def queue_execute_step(
             "review_policy": step_result["review_policy"],
             "review_required": step_result["review_required"],
             "candidate_id": step_result["candidate_id"],
-            "manuscript_path": manuscript_path,
+            "manuscript_path": step_result["manuscript_path"],
         }
 
     return _queue_job(
@@ -993,6 +1540,7 @@ def queue_chapter_auto_run(
     def worker(job_id: str) -> dict[str, Any]:
         completed_steps: list[str] = []
         paused_at: dict[str, Any] | None = None
+        manuscript_path: str | None = None
         for step_name in runner_cli.step_order_for_chapter(chapter):
             _raise_if_cancel_requested(job_id)
             step_result = _execute_step_once(
@@ -1004,6 +1552,8 @@ def queue_chapter_auto_run(
                 job_id=job_id,
             )
             completed_steps.append(step_result["step"])
+            if step_result["manuscript_path"]:
+                manuscript_path = step_result["manuscript_path"]
             if step_result["review_required"]:
                 paused_at = {
                     "step": step_result["step"],
@@ -1011,11 +1561,6 @@ def queue_chapter_auto_run(
                     "candidate_id": step_result["candidate_id"],
                 }
                 break
-
-        manuscript_path: str | None = None
-        if "summary" in completed_steps and paused_at is None:
-            output_path = _build_manuscript_for_run(run_id)
-            manuscript_path = _display_path(output_path)
 
         return {
             "run_id": run_id,
@@ -1106,7 +1651,7 @@ def queue_rerun_step(
 ) -> dict[str, Any]:
     del force
     review_mode = review_mode.strip().lower() or "manual"
-    if review_mode not in {"manual", "auto"}:
+    if review_mode not in REVIEW_POLICIES:
         raise ValidationBridgeError(
             [{"code": "review_mode_invalid", "message": f"Unsupported review_mode: {review_mode}"}]
         )
@@ -1124,38 +1669,52 @@ def queue_rerun_step(
             chapter=chapter,
             step=storage_step,
         )
-        prompt = runner_renderer.render_step(run_id, chapter, storage_step)
-        prompt = _steering_prompt(prompt, steering_note)
+        try:
+            prompt = runner_renderer.render_step(run_id, chapter, storage_step)
+            prompt = _steering_prompt(prompt, steering_note)
+            _append_job_event(
+                job_id,
+                "prompt_rendered",
+                f"Prompt rendered: {storage_step}",
+                chapter=chapter,
+                step=storage_step,
+                prompt_chars=len(prompt),
+                steering_note=steering_note.strip(),
+            )
 
-        result = runner_api.call_step(
-            prompt,
-            storage_step,
-            run_id=run_id,
-            chapter=chapter,
-            cli_model_config=model_config,
-        )
-        response = result["response"]
-        content = _response_text(response).strip()
-        if not content:
-            raise BridgeError("Model returned an empty response body")
+            result, warnings = _call_model_step_with_job_events(
+                prompt=prompt,
+                step_name=storage_step,
+                run_id=run_id,
+                chapter=chapter,
+                job_id=job_id,
+                model_config=model_config,
+            )
+            response = result["response"]
+            content = _response_text(response).strip()
+            if not content:
+                raise BridgeError("Model returned an empty response body")
 
-        if storage_step in {"draft", "final"}:
-            min_word_count = 500
-            if storage_step == "final":
-                draft_text = runner_state.get_step_output(run_id, chapter, "draft") or ""
-                draft_word_count = runner_validator.count_words(draft_text)
-                if draft_word_count:
-                    min_word_count = max(min_word_count, int(draft_word_count * 0.4))
+            if storage_step in {"draft", "final"}:
+                min_word_count = 500
+                if storage_step == "final":
+                    draft_text = runner_state.get_step_output(run_id, chapter, "draft") or ""
+                    draft_word_count = runner_validator.count_words(draft_text)
+                    if draft_word_count:
+                        min_word_count = max(min_word_count, int(draft_word_count * 0.4))
 
-            ok, reason = runner_validator.check_prose_response(content, min_word_count=min_word_count)
-            if not ok:
-                fail_dir = runner_renderer.RENDERED_DIR / run_id
-                fail_dir.mkdir(parents=True, exist_ok=True)
-                fail_path = fail_dir / f"ch{chapter:02d}_{storage_step}_rerun_validation_fail.md"
-                fail_path.write_text(content, encoding="utf-8")
-                raise BridgeError(
-                    f"Rerun for step '{storage_step}' produced invalid prose output ({reason}). Saved: {fail_path}"
-                )
+                ok, reason = runner_validator.check_prose_response(content, min_word_count=min_word_count)
+                if not ok:
+                    fail_dir = runner_renderer.RENDERED_DIR / run_id
+                    fail_dir.mkdir(parents=True, exist_ok=True)
+                    fail_path = fail_dir / f"ch{chapter:02d}_{storage_step}_rerun_validation_fail.md"
+                    fail_path.write_text(content, encoding="utf-8")
+                    raise BridgeError(
+                        f"Rerun for step '{storage_step}' produced invalid prose output ({reason}). Saved: {fail_path}"
+                    )
+        except Exception as exc:
+            _append_step_failure_event(job_id, str(exc), chapter=chapter, step=storage_step)
+            raise
 
         candidate = _candidate_record(
             chapter=chapter,
@@ -1163,6 +1722,10 @@ def queue_rerun_step(
             source="rerun",
             content=content,
             steering_note=steering_note.strip(),
+        )
+        review_required, review_reason, review_status = _review_checkpoint_for_policy(
+            review_mode,
+            warnings_present=bool(warnings),
         )
 
         def mutator(updated: dict[str, Any]) -> None:
@@ -1172,9 +1735,9 @@ def queue_rerun_step(
             step_review = _ensure_review_state(updated, chapter, storage_step)
             step_review.update(
                 {
-                    "review_required": True,
-                    "review_reason": "manual" if review_mode == "manual" else "policy",
-                    "review_status": "pending",
+                    "review_required": review_required,
+                    "review_reason": review_reason,
+                    "review_status": review_status,
                     "approved_candidate_id": None,
                     "last_reviewed_at": None,
                 }
@@ -1203,13 +1766,30 @@ def queue_rerun_step(
             chapter=chapter,
             step=storage_step,
             candidate_id=candidate["candidate_id"],
+            review_required=review_required,
+            review_mode=review_mode,
+            warning_count=len(warnings),
         )
+        if review_required:
+            _append_job_event(
+                job_id,
+                "warning",
+                "Rerun candidate requires review",
+                chapter=chapter,
+                step=storage_step,
+                candidate_id=candidate["candidate_id"],
+                review_mode=review_mode,
+                review_reason=review_reason,
+                warning_count=len(warnings),
+            )
         return {
             "run_id": run_id,
             "chapter": chapter,
             "step": storage_step,
             "candidate_id": candidate["candidate_id"],
-            "review_status": "pending",
+            "review_status": review_status,
+            "review_required": review_required,
+            "warning_count": len(warnings),
         }
 
     job = _queue_job(

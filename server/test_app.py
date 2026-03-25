@@ -73,6 +73,15 @@ def test_get_config() -> None:
     assert payload["data"]["project"]["name"] == "eaw"
 
 
+def test_get_step_settings_returns_structured_view() -> None:
+    response = client.get("/api/step-settings")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["steps"]["draft"]["model_config"] == "gpt-5.4"
+    assert payload["steps"]["draft"]["max_tokens"] == 60000
+    assert payload["steps"]["final"]["extras"]["reasoning"]["effort"] == "low"
+
+
 def test_get_model() -> None:
     response = client.get("/api/models/default.yaml")
     assert response.status_code == 200
@@ -108,6 +117,49 @@ def test_put_config_rejects_non_mapping_yaml() -> None:
     assert "mapping" in response.json()["detail"]
 
 
+def test_put_step_settings_updates_config_and_preserves_extras(tmp_path: Path, monkeypatch) -> None:
+    _, config_path, _ = _configure_temp_runner(tmp_path, monkeypatch)
+    config_path.write_text(
+        (
+            "project:\n"
+            "  name: test-project\n"
+            "  total_chapters: 6\n"
+            "  default_model_config: default\n"
+            "step_models:\n"
+            "  final: default\n"
+            "step_overrides:\n"
+            "  final:\n"
+            "    max_tokens: 4000\n"
+            "    temperature: 0.5\n"
+            "    reasoning:\n"
+            "      effort: medium\n"
+        ),
+        encoding="utf-8",
+    )
+
+    response = client.put(
+        "/api/step-settings/final",
+        json={
+            "model_config": "claude-sonnet-4.6",
+            "max_tokens": 12000,
+            "temperature": 0.7,
+            "extras": {"reasoning": {"effort": "high"}},
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["model_config"] == "claude-sonnet-4.6"
+    assert payload["max_tokens"] == 12000
+    assert payload["temperature"] == 0.7
+    assert payload["extras"]["reasoning"]["effort"] == "high"
+
+    updated = runner_bridge.runner_state.load_config(config_path)
+    assert updated["step_models"]["final"] == "claude-sonnet-4.6"
+    assert updated["step_overrides"]["final"]["max_tokens"] == 12000
+    assert updated["step_overrides"]["final"]["temperature"] == 0.7
+    assert updated["step_overrides"]["final"]["reasoning"]["effort"] == "high"
+
+
 def test_validate_worksheet_rejects_h1_heading(tmp_path: Path) -> None:
     worksheet = tmp_path / "bad.md"
     worksheet.write_text("# bad heading\n", encoding="utf-8")
@@ -138,6 +190,86 @@ def test_create_run_creates_state_file(tmp_path: Path, monkeypatch) -> None:
     assert payload["status"] == "created"
     assert payload["worksheet_validation"]["ok"] is True
     assert (state_dir / "api_created.json").exists()
+
+
+def test_create_project_from_dossier_persists_blocks_and_draft(tmp_path: Path, monkeypatch) -> None:
+    state_dir, _, _ = _configure_temp_runner(tmp_path, monkeypatch)
+
+    response = client.post(
+        "/api/projects/from-dossier",
+        json={
+            "run_id": "dossier_run",
+            "blocks": [
+                {
+                    "label": "brain_dump",
+                    "source_type": "pasted_text",
+                    "source_name": "session-input",
+                    "text": "Raw story concept and stakes.",
+                },
+                {
+                    "label": "character_notes",
+                    "source_type": "uploaded_markdown",
+                    "source_name": "anna.md",
+                    "text": "Lead character is guarded but impulsive.",
+                },
+            ],
+            "model_config": "default",
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "draft_ready"
+    assert (state_dir / "dossier_run.json").exists()
+    assert payload["dossier_blocks"][0]["mapping_targets"] == ["section_1.required_data_layer"]
+
+    saved = runner_bridge.runner_state.load_state("dossier_run")
+    assert saved["studio"]["run_settings"]["created_from"] == "dossier"
+    assert saved["studio"]["dossier_blocks"][0]["label"] == "brain_dump"
+    assert "## section_1_required_data_layer" in saved["worksheet"]
+    assert "## section_3_protagonist_operating_systems" in saved["worksheet"]
+
+
+def test_branch_run_copies_state_and_sets_lineage(tmp_path: Path, monkeypatch) -> None:
+    state_dir, _, worksheet_path = _configure_temp_runner(tmp_path, monkeypatch)
+    _create_temp_run("source_run", worksheet_path)
+
+    def seed_source_state(data: dict) -> None:
+        data.setdefault("chapters", {}).setdefault("2", {})["draft"] = "Original chapter draft."
+        data["studio"] = {
+            "run_settings": {
+                "output_dir": None,
+                "review_policy": {"draft": "manual"},
+                "default_steering_note": "",
+                "created_from": "worksheet",
+            }
+        }
+
+    runner_bridge.runner_state.update_state("source_run", seed_source_state)
+
+    response = client.post(
+        "/api/runs/source_run/branch",
+        json={
+            "new_run_id": "source_run_branch_a",
+            "branched_from_chapter": 2,
+            "branch_note": "Test alternate chapter 3 direction.",
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "created"
+    assert payload["parent_run_id"] == "source_run"
+    assert (state_dir / "source_run_branch_a.json").exists()
+
+    source = runner_bridge.runner_state.load_state("source_run")
+    branch = runner_bridge.runner_state.load_state("source_run_branch_a")
+    assert source["run_id"] == "source_run"
+    assert branch["run_id"] == "source_run_branch_a"
+    assert branch["chapters"]["2"]["draft"] == "Original chapter draft."
+    assert branch["studio"]["run_settings"]["review_policy"]["draft"] == "manual"
+    assert branch["studio"]["branch"]["parent_run_id"] == "source_run"
+    assert branch["studio"]["branch"]["branched_from_chapter"] == 2
+    assert branch["studio"]["branch"]["branch_note"] == "Test alternate chapter 3 direction."
+    assert branch["studio"]["branch"]["branched_at"]
 
 
 def test_put_worksheet_section_updates_run_state(tmp_path: Path, monkeypatch) -> None:
@@ -283,14 +415,18 @@ def test_chapter_auto_run_job_executes_runner_step_order(tmp_path: Path, monkeyp
     _create_temp_run("auto_run", worksheet_path)
     calls: list[str] = []
 
-    def fake_execute_step(run_id: str, chapter: int, step_name: str, model_config=None, force: bool = False) -> str:
-        del model_config, force
+    def fake_call_step(prompt: str, step_name: str, **kwargs) -> dict:
+        del prompt, kwargs
         calls.append(step_name)
-        storage_step = runner_bridge._storage_step_name(step_name)
-        runner_bridge.runner_state.save_step_output(run_id, chapter, storage_step, f"{storage_step} output.")
-        return f"{step_name} complete"
+        return {
+            "response": {"choices": [{"message": {"content": f"{step_name} output."}}], "usage": {}},
+            "model_config": {"model": "mock/model"},
+            "attempts": 1,
+            "estimated_prompt_tokens": 100,
+        }
 
-    monkeypatch.setattr(runner_bridge.runner_cli, "execute_step", fake_execute_step)
+    monkeypatch.setattr(runner_bridge.runner_api, "call_step", fake_call_step)
+    monkeypatch.setattr(runner_bridge.runner_metrics, "update_cumulative", lambda *args, **kwargs: {})
 
     response = client.post("/api/runs/auto_run/chapters/1/auto", json={"force": True})
     assert response.status_code == 200
@@ -314,13 +450,20 @@ def test_single_step_endpoint_sets_manual_review_checkpoint(tmp_path: Path, monk
 
     runner_bridge.runner_state.update_state("single_step_run", seed_existing_chapter)
 
-    def fake_execute_step(run_id: str, chapter: int, step_name: str, model_config=None, force: bool = False) -> str:
-        del model_config, force
-        storage_step = runner_bridge._storage_step_name(step_name)
-        runner_bridge.runner_state.save_step_output(run_id, chapter, storage_step, f"{storage_step} content")
-        return f"{storage_step} content"
+    def fake_call_step(prompt: str, step_name: str, **kwargs) -> dict:
+        del prompt, kwargs
+        content = f"{step_name} content"
+        if step_name == "draft":
+            content = ("Draft content with enough complete words to satisfy validation. " * 90).strip() + "."
+        return {
+            "response": {"choices": [{"message": {"content": content}}], "usage": {}},
+            "model_config": {"model": "mock/model"},
+            "attempts": 1,
+            "estimated_prompt_tokens": 100,
+        }
 
-    monkeypatch.setattr(runner_bridge.runner_cli, "execute_step", fake_execute_step)
+    monkeypatch.setattr(runner_bridge.runner_api, "call_step", fake_call_step)
+    monkeypatch.setattr(runner_bridge.runner_metrics, "update_cumulative", lambda *args, **kwargs: {})
 
     response = client.post("/api/runs/single_step_run/chapters/1/steps/draft", json={})
     assert response.status_code == 200
@@ -329,7 +472,7 @@ def test_single_step_endpoint_sets_manual_review_checkpoint(tmp_path: Path, monk
     assert job["result"]["review_required"] is True
 
     updated = runner_bridge.runner_state.load_state("single_step_run")
-    assert updated["chapters"]["1"]["draft"] == "draft content"
+    assert updated["chapters"]["1"]["draft"].startswith("Draft content with enough complete words")
     assert updated["studio"]["review_state"]["1"]["draft"]["review_status"] == "pending"
     assert updated["studio"]["candidate_outputs"][0]["source"] == "initial_run"
 
@@ -394,17 +537,104 @@ def test_rerun_job_creates_candidate_without_overwriting_canonical_output(tmp_pa
     assert review_state["review_required"] is True
 
 
+def test_rerun_on_warning_requires_review_when_retry_recovers(tmp_path: Path, monkeypatch) -> None:
+    _, config_path, worksheet_path = _configure_temp_runner(tmp_path, monkeypatch)
+    config_path.write_text(
+        (
+            "project:\n"
+            "  name: test-project\n"
+            "  total_chapters: 6\n"
+            "openrouter:\n"
+            "  base_url: https://openrouter.ai/api/v1/chat/completions\n"
+            "steps:\n"
+            "  warn_context_tokens: 50\n"
+        ),
+        encoding="utf-8",
+    )
+    _create_temp_run("rerun_warning_run", worksheet_path)
+
+    def seed_rerun_state(data: dict) -> None:
+        data.setdefault("chapters", {}).setdefault("2", {})["draft"] = "Canonical draft stays."
+
+    runner_bridge.runner_state.update_state("rerun_warning_run", seed_rerun_state)
+
+    def fake_call_step(prompt: str, step_name: str, attempt_logger=None, **kwargs) -> dict:
+        del step_name, kwargs
+        if attempt_logger:
+            attempt_logger({"attempt": 1, "status": "started", "model": "mock/model", "estimated_prompt_tokens": 80})
+            attempt_logger(
+                {
+                    "attempt": 1,
+                    "status": "error",
+                    "model": "mock/model",
+                    "estimated_prompt_tokens": 80,
+                    "error": "Transient upstream error",
+                }
+            )
+            attempt_logger({"attempt": 2, "status": "started", "model": "mock/model", "estimated_prompt_tokens": 80})
+            attempt_logger({"attempt": 2, "status": "success", "model": "mock/model", "estimated_prompt_tokens": 80})
+        assert "Steering Note" not in prompt
+        return {
+            "response": {
+                "choices": [
+                    {
+                        "message": {
+                            "content": ("Recovered candidate output with enough complete words to satisfy validation. " * 90).strip()
+                            + "."
+                        }
+                    }
+                ],
+                "usage": {},
+            },
+            "model_config": {"model": "mock/model"},
+            "attempts": 2,
+            "estimated_prompt_tokens": 80,
+        }
+
+    monkeypatch.setattr(runner_bridge.runner_api, "call_step", fake_call_step)
+    monkeypatch.setattr(runner_bridge.runner_metrics, "update_cumulative", lambda *args, **kwargs: {})
+
+    response = client.post(
+        "/api/runs/rerun_warning_run/chapters/2/steps/draft/rerun",
+        json={"review_mode": "on_warning"},
+    )
+    assert response.status_code == 200
+    job_id = response.json()["job_id"]
+    job = _wait_for_job(job_id)
+    assert job["status"] == "succeeded"
+    assert job["result"]["review_required"] is True
+    assert job["result"]["review_status"] == "pending"
+    assert job["result"]["warning_count"] == 2
+
+    updated = runner_bridge.runner_state.load_state("rerun_warning_run")
+    review_state = updated["studio"]["review_state"]["2"]["draft"]
+    assert review_state["review_reason"] == "warning"
+    assert review_state["review_required"] is True
+
+    stream_response = client.get(f"/api/jobs/{job_id}/events")
+    assert stream_response.status_code == 200
+    assert "event: attempt_failed" in stream_response.text
+    assert "event: warning" in stream_response.text
+
+
 def test_job_events_endpoint_streams_sse_payload(tmp_path: Path, monkeypatch) -> None:
     _, _, worksheet_path = _configure_temp_runner(tmp_path, monkeypatch)
     _create_temp_run("events_run", worksheet_path)
 
-    def fake_execute_step(run_id: str, chapter: int, step_name: str, model_config=None, force: bool = False) -> str:
-        del model_config, force
-        storage_step = runner_bridge._storage_step_name(step_name)
-        runner_bridge.runner_state.save_step_output(run_id, chapter, storage_step, "plan content")
-        return "plan content"
+    def fake_call_step(prompt: str, step_name: str, attempt_logger=None, **kwargs) -> dict:
+        del prompt, kwargs
+        if attempt_logger:
+            attempt_logger({"attempt": 1, "status": "started", "model": "mock/model", "estimated_prompt_tokens": 100})
+            attempt_logger({"attempt": 1, "status": "success", "model": "mock/model", "estimated_prompt_tokens": 100})
+        return {
+            "response": {"choices": [{"message": {"content": "plan content"}}], "usage": {}},
+            "model_config": {"model": "mock/model"},
+            "attempts": 1,
+            "estimated_prompt_tokens": 100,
+        }
 
-    monkeypatch.setattr(runner_bridge.runner_cli, "execute_step", fake_execute_step)
+    monkeypatch.setattr(runner_bridge.runner_api, "call_step", fake_call_step)
+    monkeypatch.setattr(runner_bridge.runner_metrics, "update_cumulative", lambda *args, **kwargs: {})
 
     response = client.post("/api/runs/events_run/chapters/1/steps/plan", json={})
     job = _wait_for_job(response.json()["job_id"])
@@ -414,6 +644,8 @@ def test_job_events_endpoint_streams_sse_payload(tmp_path: Path, monkeypatch) ->
     assert stream_response.status_code == 200
     assert stream_response.headers["content-type"].startswith("text/event-stream")
     assert "event: job_queued" in stream_response.text
+    assert "event: prompt_rendered" in stream_response.text
+    assert "event: attempt_started" in stream_response.text
     assert "event: job_finished" in stream_response.text
 
 
@@ -493,15 +725,21 @@ def test_active_job_conflict_blocks_second_run_scoped_job(tmp_path: Path, monkey
     release = threading.Event()
     blocked = {"value": False}
 
-    def slow_execute_step(run_id: str, chapter: int, step_name: str, model_config=None, force: bool = False) -> str:
-        del run_id, chapter, step_name, model_config, force
+    def slow_call_step(prompt: str, step_name: str, **kwargs) -> dict:
+        del prompt, step_name, kwargs
         if not blocked["value"]:
             blocked["value"] = True
             entered.set()
             release.wait(2.0)
-        return "ok"
+        return {
+            "response": {"choices": [{"message": {"content": "ok"}}], "usage": {}},
+            "model_config": {"model": "mock/model"},
+            "attempts": 1,
+            "estimated_prompt_tokens": 100,
+        }
 
-    monkeypatch.setattr(runner_bridge.runner_cli, "execute_step", slow_execute_step)
+    monkeypatch.setattr(runner_bridge.runner_api, "call_step", slow_call_step)
+    monkeypatch.setattr(runner_bridge.runner_metrics, "update_cumulative", lambda *args, **kwargs: {})
 
     first_response = client.post("/api/runs/conflict_run/chapters/1/auto", json={})
     assert first_response.status_code == 200
@@ -543,17 +781,21 @@ def test_cancel_running_chapter_auto_job_stops_before_next_step(tmp_path: Path, 
     release = threading.Event()
     calls: list[str] = []
 
-    def slow_execute_step(run_id: str, chapter: int, step_name: str, model_config=None, force: bool = False) -> str:
-        del model_config, force
+    def slow_call_step(prompt: str, step_name: str, **kwargs) -> dict:
+        del prompt, kwargs
         calls.append(step_name)
-        storage_step = runner_bridge._storage_step_name(step_name)
-        runner_bridge.runner_state.save_step_output(run_id, chapter, storage_step, f"{storage_step} output")
         if step_name == "plan":
             entered.set()
             release.wait(2.0)
-        return f"{storage_step} output"
+        return {
+            "response": {"choices": [{"message": {"content": f"{step_name} output"}}], "usage": {}},
+            "model_config": {"model": "mock/model"},
+            "attempts": 1,
+            "estimated_prompt_tokens": 100,
+        }
 
-    monkeypatch.setattr(runner_bridge.runner_cli, "execute_step", slow_execute_step)
+    monkeypatch.setattr(runner_bridge.runner_api, "call_step", slow_call_step)
+    monkeypatch.setattr(runner_bridge.runner_metrics, "update_cumulative", lambda *args, **kwargs: {})
 
     response = client.post("/api/runs/cancel_run/chapters/2/auto", json={})
     assert response.status_code == 200
