@@ -29,6 +29,11 @@ class CreateRunRequest(BaseModel):
     review_policy: dict[str, str] | None = None
 
 
+class ChapterAutoRunRequest(BaseModel):
+    model_config_name: str | None = Field(default=None, alias="model_config")
+    force: bool = False
+
+
 class StepApprovalRequest(BaseModel):
     candidate_id: str
 
@@ -36,6 +41,13 @@ class StepApprovalRequest(BaseModel):
 class ManualContinueRequest(BaseModel):
     content: str
     review_note: str = ""
+
+
+class StepRerunRequest(BaseModel):
+    steering_note: str = ""
+    force: bool = False
+    review_mode: str = "manual"
+    model_config_name: str | None = Field(default=None, alias="model_config")
 
 
 @app.get("/healthz")
@@ -151,6 +163,70 @@ def create_run(request: CreateRunRequest):
             model_config=request.model_config_name,
             output_dir=request.output_dir,
             review_policy=request.review_policy,
+        )
+    except runner_bridge.ValidationBridgeError as exc:
+        return JSONResponse(status_code=400, content={"status": "validation_error", "errors": exc.errors})
+    except runner_bridge.BridgeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/jobs/{job_id}")
+def get_job(job_id: str) -> dict[str, object]:
+    try:
+        return runner_bridge.get_job(job_id)
+    except runner_bridge.BridgeError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/api/runs/{run_id}/build-manuscript")
+def build_manuscript(run_id: str) -> dict[str, object]:
+    try:
+        return runner_bridge.queue_build_manuscript(run_id)
+    except runner_bridge.JobConflictBridgeError as exc:
+        return JSONResponse(
+            status_code=409,
+            content={"status": "active_job_conflict", "run_id": exc.run_id, "active_job_id": exc.active_job_id},
+        )
+    except runner_bridge.BridgeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/runs/{run_id}/chapters/{chapter}/auto")
+def auto_run_chapter(run_id: str, chapter: int, request: ChapterAutoRunRequest) -> dict[str, object]:
+    try:
+        return runner_bridge.queue_chapter_auto_run(
+            run_id=run_id,
+            chapter=chapter,
+            model_config=request.model_config_name,
+            force=request.force,
+        )
+    except runner_bridge.JobConflictBridgeError as exc:
+        return JSONResponse(
+            status_code=409,
+            content={"status": "active_job_conflict", "run_id": exc.run_id, "active_job_id": exc.active_job_id},
+        )
+    except runner_bridge.ValidationBridgeError as exc:
+        return JSONResponse(status_code=400, content={"status": "validation_error", "errors": exc.errors})
+    except runner_bridge.BridgeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/runs/{run_id}/chapters/{chapter}/steps/{step}/rerun")
+def rerun_step(run_id: str, chapter: int, step: str, request: StepRerunRequest) -> dict[str, object]:
+    try:
+        return runner_bridge.queue_rerun_step(
+            run_id=run_id,
+            chapter=chapter,
+            step=step,
+            steering_note=request.steering_note,
+            force=request.force,
+            review_mode=request.review_mode,
+            model_config=request.model_config_name,
+        )
+    except runner_bridge.JobConflictBridgeError as exc:
+        return JSONResponse(
+            status_code=409,
+            content={"status": "active_job_conflict", "run_id": exc.run_id, "active_job_id": exc.active_job_id},
         )
     except runner_bridge.ValidationBridgeError as exc:
         return JSONResponse(status_code=400, content={"status": "validation_error", "errors": exc.errors})

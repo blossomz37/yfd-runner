@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import copy
 import os
 import re
 import sys
+import threading
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -16,9 +18,13 @@ MODELS_DIR = RUNNER_DIR / "models"
 if str(RUNNER_DIR) not in sys.path:
     sys.path.insert(0, str(RUNNER_DIR))
 
+import api as runner_api
+import metrics as runner_metrics
 import renderer as runner_renderer
-import state as runner_state
 import manuscript as runner_manuscript
+import runner as runner_cli
+import state as runner_state
+import validator as runner_validator
 
 
 class BridgeError(Exception):
@@ -31,6 +37,20 @@ class ValidationBridgeError(BridgeError):
     def __init__(self, errors: list[dict[str, str]]):
         self.errors = errors
         super().__init__("Validation failed")
+
+
+class JobConflictBridgeError(BridgeError):
+    """Raised when a run already has an active queued or running job."""
+
+    def __init__(self, run_id: str, active_job_id: str):
+        self.run_id = run_id
+        self.active_job_id = active_job_id
+        super().__init__(f"Run already has an active job: {active_job_id}")
+
+
+JOBS_LOCK = threading.Lock()
+JOBS: dict[str, dict[str, Any]] = {}
+ACTIVE_RUN_JOBS: dict[str, str] = {}
 
 
 def _validate_relative_name(name: str, suffix: str) -> str:
@@ -308,6 +328,114 @@ def _new_candidate_id() -> str:
     return f"cand_{uuid4().hex[:12]}"
 
 
+def _new_job_id() -> str:
+    return f"job_{uuid4().hex[:12]}"
+
+
+def _job_snapshot(job_id: str) -> dict[str, Any]:
+    with JOBS_LOCK:
+        job = JOBS.get(job_id)
+        if job is None:
+            raise BridgeError(f"Job not found: {job_id}")
+        return copy.deepcopy(job)
+
+
+def _job_event(event: str, message: str, **fields: Any) -> dict[str, Any]:
+    payload = {
+        "event": event,
+        "message": message,
+        "timestamp": runner_state.now_iso(),
+    }
+    payload.update(fields)
+    return payload
+
+
+def _append_job_event(job_id: str, event: str, message: str, **fields: Any) -> None:
+    with JOBS_LOCK:
+        job = JOBS.get(job_id)
+        if job is None:
+            return
+        job.setdefault("events", []).append(_job_event(event, message, **fields))
+
+
+def _finish_job(job_id: str, *, status: str, result: dict[str, Any] | None = None, error: str | None = None) -> None:
+    with JOBS_LOCK:
+        job = JOBS.get(job_id)
+        if job is None:
+            return
+        job["status"] = status
+        job["finished_at"] = runner_state.now_iso()
+        if result is not None:
+            job["result"] = result
+        if error is not None:
+            job["error"] = error
+        run_id = str(job.get("run_id", ""))
+        if run_id and ACTIVE_RUN_JOBS.get(run_id) == job_id:
+            del ACTIVE_RUN_JOBS[run_id]
+
+
+def _run_job(job_id: str, worker) -> None:
+    with JOBS_LOCK:
+        job = JOBS.get(job_id)
+        if job is None:
+            return
+        job["status"] = "running"
+        job["started_at"] = runner_state.now_iso()
+
+    _append_job_event(job_id, "job_started", "Job started")
+    try:
+        result = worker(job_id)
+    except Exception as exc:  # pragma: no cover - exercised via API tests instead
+        _append_job_event(job_id, "job_failed", str(exc))
+        _finish_job(job_id, status="failed", error=str(exc))
+        return
+
+    _append_job_event(job_id, "job_finished", "Job finished successfully")
+    _finish_job(job_id, status="succeeded", result=result)
+
+
+def _queue_job(
+    *,
+    run_id: str,
+    job_type: str,
+    target: dict[str, Any],
+    worker,
+) -> dict[str, Any]:
+    _load_run_data(run_id)
+    with JOBS_LOCK:
+        active_job_id = ACTIVE_RUN_JOBS.get(run_id)
+        if active_job_id:
+            active_job = JOBS.get(active_job_id)
+            if active_job and active_job.get("status") in {"queued", "running"}:
+                raise JobConflictBridgeError(run_id, active_job_id)
+
+        job_id = _new_job_id()
+        record = {
+            "job_id": job_id,
+            "job_type": job_type,
+            "status": "queued",
+            "run_id": run_id,
+            "target": target,
+            "created_at": runner_state.now_iso(),
+            "started_at": None,
+            "finished_at": None,
+            "result": None,
+            "error": None,
+            "events": [_job_event("job_queued", "Job queued", **target)],
+        }
+        JOBS[job_id] = record
+        ACTIVE_RUN_JOBS[run_id] = job_id
+        queued_snapshot = copy.deepcopy(record)
+
+    thread = threading.Thread(target=_run_job, args=(job_id, worker), daemon=True)
+    thread.start()
+    return queued_snapshot
+
+
+def get_job(job_id: str) -> dict[str, Any]:
+    return _job_snapshot(job_id)
+
+
 def _validate_step_slot_exists(data: dict[str, Any], chapter: int, step: str) -> None:
     if step == "plan":
         return
@@ -337,6 +465,78 @@ def _run_output_dir_from_data(data: dict[str, Any]) -> Path | None:
     if not output_dir:
         return None
     return Path(str(output_dir))
+
+
+def _build_manuscript_for_run(run_id: str) -> Path:
+    data = _load_run_data(run_id)
+    return runner_manuscript.build_manuscript(run_id, output_dir=_run_output_dir_from_data(data))
+
+
+def _response_text(response: dict[str, Any]) -> str:
+    choices = response.get("choices") or []
+    if not choices:
+        return ""
+
+    message = choices[0].get("message", {})
+    content = message.get("content", "")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, dict):
+                parts.append(str(item.get("text", "")))
+            else:
+                parts.append(str(item))
+        return "\n".join(part for part in parts if part)
+    return str(content)
+
+
+def _steering_prompt(prompt: str, steering_note: str) -> str:
+    note = steering_note.strip()
+    if not note:
+        return prompt
+    return f"## Steering Note\n{note}\n\n---\n\n{prompt}"
+
+
+def _review_policy_for_step(data: dict[str, Any], step: str) -> str:
+    studio = data.get("studio", {})
+    if not isinstance(studio, dict):
+        return "manual"
+    run_settings = studio.get("run_settings", {})
+    if not isinstance(run_settings, dict):
+        return "manual"
+    review_policy = run_settings.get("review_policy", {})
+    if not isinstance(review_policy, dict):
+        return "manual"
+    return str(review_policy.get(step) or "manual")
+
+
+def _set_review_state(
+    run_id: str,
+    chapter: int,
+    step: str,
+    *,
+    review_required: bool,
+    review_reason: str,
+    review_status: str,
+    approved_candidate_id: str | None = None,
+) -> None:
+    reviewed_at = runner_state.now_iso() if review_status != "pending" else None
+
+    def mutator(data: dict[str, Any]) -> None:
+        step_review = _ensure_review_state(data, chapter, step)
+        step_review.update(
+            {
+                "review_required": review_required,
+                "review_reason": review_reason,
+                "review_status": review_status,
+                "approved_candidate_id": approved_candidate_id,
+                "last_reviewed_at": reviewed_at,
+            }
+        )
+
+    runner_state.update_state(run_id, mutator)
 
 
 def _sync_summary_and_manuscript_if_needed(run_id: str, step: str) -> dict[str, Any] | None:
@@ -447,6 +647,210 @@ def create_run(
         "status": "created",
         "worksheet_validation": validation,
         "state_path": _display_path(runner_state.state_path(run_id)),
+    }
+
+
+def queue_build_manuscript(run_id: str) -> dict[str, Any]:
+    def worker(job_id: str) -> dict[str, Any]:
+        _append_job_event(job_id, "step_started", "Build manuscript started")
+        output_path = _build_manuscript_for_run(run_id)
+        _append_job_event(
+            job_id,
+            "step_succeeded",
+            "Build manuscript finished",
+            output_path=_display_path(output_path),
+        )
+        return {
+            "run_id": run_id,
+            "output_path": _display_path(output_path),
+        }
+
+    return _queue_job(
+        run_id=run_id,
+        job_type="build_manuscript",
+        target={"run_id": run_id},
+        worker=worker,
+    )
+
+
+def queue_chapter_auto_run(
+    run_id: str,
+    chapter: int,
+    *,
+    model_config: str | None = None,
+    force: bool = False,
+) -> dict[str, Any]:
+    def worker(job_id: str) -> dict[str, Any]:
+        completed_steps: list[str] = []
+        for step_name in runner_cli.step_order_for_chapter(chapter):
+            canonical_step = _storage_step_name(step_name)
+            _append_job_event(
+                job_id,
+                "step_started",
+                f"Step started: {canonical_step}",
+                chapter=chapter,
+                step=canonical_step,
+            )
+            runner_cli.execute_step(run_id, chapter, step_name, model_config=model_config, force=force)
+            completed_steps.append(canonical_step)
+            _append_job_event(
+                job_id,
+                "step_succeeded",
+                f"Step succeeded: {canonical_step}",
+                chapter=chapter,
+                step=canonical_step,
+            )
+
+        manuscript_path: str | None = None
+        if "summary" in completed_steps:
+            output_path = _build_manuscript_for_run(run_id)
+            manuscript_path = _display_path(output_path)
+
+        return {
+            "run_id": run_id,
+            "chapter": chapter,
+            "completed_steps": completed_steps,
+            "manuscript_path": manuscript_path,
+        }
+
+    return _queue_job(
+        run_id=run_id,
+        job_type="chapter_auto_run",
+        target={"run_id": run_id, "chapter": chapter},
+        worker=worker,
+    )
+
+
+def queue_rerun_step(
+    run_id: str,
+    chapter: int,
+    step: str,
+    *,
+    steering_note: str = "",
+    force: bool = False,
+    review_mode: str = "manual",
+    model_config: str | None = None,
+) -> dict[str, Any]:
+    del force
+    review_mode = review_mode.strip().lower() or "manual"
+    if review_mode not in {"manual", "auto"}:
+        raise ValidationBridgeError(
+            [{"code": "review_mode_invalid", "message": f"Unsupported review_mode: {review_mode}"}]
+        )
+
+    data = _load_run_data(run_id)
+    storage_step = _storage_step_name(step)
+    _validate_step_slot_exists(data, chapter, storage_step)
+
+    def worker(job_id: str) -> dict[str, Any]:
+        _append_job_event(
+            job_id,
+            "step_started",
+            f"Rerun started: {storage_step}",
+            chapter=chapter,
+            step=storage_step,
+        )
+        prompt = runner_renderer.render_step(run_id, chapter, storage_step)
+        prompt = _steering_prompt(prompt, steering_note)
+
+        result = runner_api.call_step(
+            prompt,
+            storage_step,
+            run_id=run_id,
+            chapter=chapter,
+            cli_model_config=model_config,
+        )
+        response = result["response"]
+        content = _response_text(response).strip()
+        if not content:
+            raise BridgeError("Model returned an empty response body")
+
+        if storage_step in {"draft", "final"}:
+            min_word_count = 500
+            if storage_step == "final":
+                draft_text = runner_state.get_step_output(run_id, chapter, "draft") or ""
+                draft_word_count = runner_validator.count_words(draft_text)
+                if draft_word_count:
+                    min_word_count = max(min_word_count, int(draft_word_count * 0.4))
+
+            ok, reason = runner_validator.check_prose_response(content, min_word_count=min_word_count)
+            if not ok:
+                fail_dir = runner_renderer.RENDERED_DIR / run_id
+                fail_dir.mkdir(parents=True, exist_ok=True)
+                fail_path = fail_dir / f"ch{chapter:02d}_{storage_step}_rerun_validation_fail.md"
+                fail_path.write_text(content, encoding="utf-8")
+                raise BridgeError(
+                    f"Rerun for step '{storage_step}' produced invalid prose output ({reason}). Saved: {fail_path}"
+                )
+
+        candidate = _candidate_record(
+            chapter=chapter,
+            step=storage_step,
+            source="rerun",
+            content=content,
+            steering_note=steering_note.strip(),
+        )
+
+        def mutator(updated: dict[str, Any]) -> None:
+            candidate_outputs = _ensure_candidate_outputs(updated)
+            candidate_outputs.append(candidate)
+
+            step_review = _ensure_review_state(updated, chapter, storage_step)
+            step_review.update(
+                {
+                    "review_required": True,
+                    "review_reason": "manual" if review_mode == "manual" else "policy",
+                    "review_status": "pending",
+                    "approved_candidate_id": None,
+                    "last_reviewed_at": None,
+                }
+            )
+
+        runner_state.update_state(run_id, mutator)
+        runner_metrics.record_call(
+            run_id,
+            chapter,
+            storage_step,
+            result["model_config"]["model"],
+            response,
+            content=content,
+            extra_fields={
+                "attempts": result["attempts"],
+                "candidate_id": candidate["candidate_id"],
+                "source": "rerun",
+            },
+        )
+        runner_metrics.update_cumulative(_load_run_data(run_id).get("project", "project"), run_id)
+
+        _append_job_event(
+            job_id,
+            "step_succeeded",
+            f"Rerun candidate created: {storage_step}",
+            chapter=chapter,
+            step=storage_step,
+            candidate_id=candidate["candidate_id"],
+        )
+        return {
+            "run_id": run_id,
+            "chapter": chapter,
+            "step": storage_step,
+            "candidate_id": candidate["candidate_id"],
+            "review_status": "pending",
+        }
+
+    job = _queue_job(
+        run_id=run_id,
+        job_type="step_rerun",
+        target={"run_id": run_id, "chapter": chapter, "step": storage_step},
+        worker=worker,
+    )
+    return {
+        "job_id": job["job_id"],
+        "status": job["status"],
+        "candidate_target": {
+            "chapter": chapter,
+            "step": storage_step,
+        },
     }
 
 

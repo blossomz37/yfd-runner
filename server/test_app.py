@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import threading
+import time
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -40,11 +42,26 @@ def _configure_temp_runner(tmp_path: Path, monkeypatch) -> tuple[Path, Path, Pat
     monkeypatch.setattr(runner_bridge.runner_state, "STATE_DIR", state_dir)
     monkeypatch.setattr(runner_bridge.runner_state, "CONFIG_PATH", config_path)
     monkeypatch.setattr(runner_bridge.runner_manuscript, "OUTPUT_DIR", tmp_path / "output")
+    with runner_bridge.JOBS_LOCK:
+        runner_bridge.JOBS.clear()
+        runner_bridge.ACTIVE_RUN_JOBS.clear()
     return state_dir, config_path, worksheet_path
 
 
 def _create_temp_run(run_id: str, worksheet_path: Path) -> None:
     runner_bridge.runner_state.initialize_run(run_id, str(worksheet_path), model_config="default")
+
+
+def _wait_for_job(job_id: str, timeout_seconds: float = 3.0) -> dict:
+    deadline = time.time() + timeout_seconds
+    while time.time() < deadline:
+        response = client.get(f"/api/jobs/{job_id}")
+        assert response.status_code == 200
+        payload = response.json()
+        if payload["status"] in {"succeeded", "failed"}:
+            return payload
+        time.sleep(0.02)
+    raise AssertionError(f"Job did not finish in time: {job_id}")
 
 
 def test_get_config() -> None:
@@ -229,3 +246,144 @@ def test_approve_candidate_promotes_content_into_canonical_step(tmp_path: Path, 
     assert review_state["approved_candidate_id"] == "cand_123"
     assert review_state["review_status"] == "approved"
     assert review_state["review_required"] is False
+
+
+def test_build_manuscript_job_uses_run_output_dir(tmp_path: Path, monkeypatch) -> None:
+    _, _, worksheet_path = _configure_temp_runner(tmp_path, monkeypatch)
+    _create_temp_run("manuscript_run", worksheet_path)
+    output_dir = tmp_path / "custom-output"
+
+    def seed_manuscript_state(data: dict) -> None:
+        data.setdefault("chapters", {}).setdefault("1", {})["final"] = "Chapter one text."
+        data.setdefault("chapters", {}).setdefault("2", {})["final"] = "Chapter two text."
+        studio = data.setdefault("studio", {})
+        studio["run_settings"] = {
+            "output_dir": str(output_dir),
+            "review_policy": {},
+            "default_steering_note": "",
+            "created_from": "worksheet",
+        }
+
+    runner_bridge.runner_state.update_state("manuscript_run", seed_manuscript_state)
+
+    response = client.post("/api/runs/manuscript_run/build-manuscript")
+    assert response.status_code == 200
+    job = _wait_for_job(response.json()["job_id"])
+    assert job["status"] == "succeeded"
+
+    manuscript_path = output_dir / "manuscript_run_manuscript.md"
+    assert manuscript_path.exists()
+    assert "# Chapter 1" in manuscript_path.read_text(encoding="utf-8")
+    assert job["result"]["output_path"] == str(manuscript_path)
+
+
+def test_chapter_auto_run_job_executes_runner_step_order(tmp_path: Path, monkeypatch) -> None:
+    _, _, worksheet_path = _configure_temp_runner(tmp_path, monkeypatch)
+    _create_temp_run("auto_run", worksheet_path)
+    calls: list[str] = []
+
+    def fake_execute_step(run_id: str, chapter: int, step_name: str, model_config=None, force: bool = False) -> str:
+        del model_config, force
+        calls.append(step_name)
+        storage_step = runner_bridge._storage_step_name(step_name)
+        runner_bridge.runner_state.save_step_output(run_id, chapter, storage_step, f"{storage_step} output.")
+        return f"{step_name} complete"
+
+    monkeypatch.setattr(runner_bridge.runner_cli, "execute_step", fake_execute_step)
+
+    response = client.post("/api/runs/auto_run/chapters/1/auto", json={"force": True})
+    assert response.status_code == 200
+    job = _wait_for_job(response.json()["job_id"])
+    assert job["status"] == "succeeded"
+    assert calls == runner_bridge.runner_cli.step_order_for_chapter(1)
+    assert job["result"]["completed_steps"] == [runner_bridge._storage_step_name(step) for step in calls]
+
+
+def test_rerun_job_creates_candidate_without_overwriting_canonical_output(tmp_path: Path, monkeypatch) -> None:
+    _, _, worksheet_path = _configure_temp_runner(tmp_path, monkeypatch)
+    _create_temp_run("rerun_run", worksheet_path)
+
+    def seed_rerun_state(data: dict) -> None:
+        data.setdefault("chapters", {}).setdefault("2", {})["draft"] = "Canonical draft stays."
+        studio = data.setdefault("studio", {})
+        studio["run_settings"] = {
+            "output_dir": None,
+            "review_policy": {"draft": "manual"},
+            "default_steering_note": "",
+            "created_from": "worksheet",
+        }
+
+    runner_bridge.runner_state.update_state("rerun_run", seed_rerun_state)
+
+    monkeypatch.setattr(
+        runner_bridge.runner_api,
+        "call_step",
+        lambda *args, **kwargs: {
+            "response": {
+                "choices": [
+                    {
+                        "message": {
+                            "content": ("Candidate rewrite with enough complete words to satisfy validation. " * 90).strip()
+                            + "."
+                        }
+                    }
+                ],
+                "usage": {},
+            },
+            "model_config": {"model": "mock/model"},
+            "attempts": 1,
+        },
+    )
+    monkeypatch.setattr(runner_bridge.runner_metrics, "update_cumulative", lambda *args, **kwargs: {})
+
+    response = client.post(
+        "/api/runs/rerun_run/chapters/2/steps/draft/rerun",
+        json={"steering_note": "Sharpen the scene.", "review_mode": "manual"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "queued"
+
+    job = _wait_for_job(payload["job_id"])
+    assert job["status"] == "succeeded"
+
+    updated = runner_bridge.runner_state.load_state("rerun_run")
+    assert updated["chapters"]["2"]["draft"] == "Canonical draft stays."
+    candidate = updated["studio"]["candidate_outputs"][0]
+    assert candidate["candidate_id"] == job["result"]["candidate_id"]
+    assert candidate["source"] == "rerun"
+    assert candidate["status"] == "candidate"
+    assert candidate["steering_note"] == "Sharpen the scene."
+    review_state = updated["studio"]["review_state"]["2"]["draft"]
+    assert review_state["review_status"] == "pending"
+    assert review_state["review_required"] is True
+
+
+def test_active_job_conflict_blocks_second_run_scoped_job(tmp_path: Path, monkeypatch) -> None:
+    _, _, worksheet_path = _configure_temp_runner(tmp_path, monkeypatch)
+    _create_temp_run("conflict_run", worksheet_path)
+    entered = threading.Event()
+    release = threading.Event()
+    blocked = {"value": False}
+
+    def slow_execute_step(run_id: str, chapter: int, step_name: str, model_config=None, force: bool = False) -> str:
+        del run_id, chapter, step_name, model_config, force
+        if not blocked["value"]:
+            blocked["value"] = True
+            entered.set()
+            release.wait(2.0)
+        return "ok"
+
+    monkeypatch.setattr(runner_bridge.runner_cli, "execute_step", slow_execute_step)
+
+    first_response = client.post("/api/runs/conflict_run/chapters/1/auto", json={})
+    assert first_response.status_code == 200
+    assert entered.wait(1.0)
+
+    second_response = client.post("/api/runs/conflict_run/build-manuscript")
+    assert second_response.status_code == 409
+    assert second_response.json()["status"] == "active_job_conflict"
+
+    release.set()
+    job = _wait_for_job(first_response.json()["job_id"])
+    assert job["status"] == "succeeded"

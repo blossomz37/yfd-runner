@@ -35,10 +35,15 @@ Purpose: turn the locked v1 slice into an implementation-facing checklist.
   - `PUT /api/config`
   - `PUT /api/runs/{runId}/worksheet/{sectionKey}`
   - `POST /api/runs`
+  - `GET /api/jobs/{jobId}`
+  - `POST /api/runs/{runId}/build-manuscript`
+  - `POST /api/runs/{runId}/chapters/{chapter}/auto`
+  - `POST /api/runs/{runId}/chapters/{chapter}/steps/{step}/rerun`
   - `POST /api/runs/{runId}/chapters/{chapter}/steps/{step}/approve`
   - `POST /api/runs/{runId}/chapters/{chapter}/steps/{step}/manual-continue`
 - added worksheet validation with H1 rejection and structured validation errors
 - added candidate approval and manual-edit traceability through `studio.review_state` and `studio.candidate_outputs`
+- added polling job records plus run-scoped active-job conflict protection
 
 ## In Progress
 
@@ -46,17 +51,24 @@ Purpose: turn the locked v1 slice into an implementation-facing checklist.
 
 - stabilize the review and orchestration layer before frontend work
 - preserve runner-compatible canonical state while adding `studio` metadata
-- keep background job and live streaming work deferred until the contract settles
+- keep live streaming work deferred until the contract settles
+
+### Backend orchestration
+
+- keep expanding the job layer from polling toward SSE events
+- keep execution mutations behind run-scoped conflict protection
+- avoid overwriting canonical outputs during rerun flows
 
 ## Next
 
 ### Backend orchestration
 
-- `POST /api/runs/{runId}/chapters/{chapter}/steps/{step}/rerun`
-- `POST /api/runs/{runId}/chapters/{chapter}/auto`
-- `POST /api/runs/{runId}/build-manuscript`
-- per-run output directory wrappers for render/manuscript tasks
-- active-job registry and conflict protection
+- `GET /api/jobs/{jobId}/events`
+- `POST /api/runs/{runId}/chapters/{chapter}/steps/{step}`
+- `POST /api/runs/{runId}/cascade/{sectionNumber}`
+- `POST /api/runs/{runId}/cascade/auto`
+- stronger rerun review policy handling and warning/failure events
+- optional cancellation handling for long-running jobs
 
 ### Frontend shell
 
