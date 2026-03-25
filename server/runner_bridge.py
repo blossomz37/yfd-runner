@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import copy
+import json
 import os
 import re
 import sys
 import threading
+import time
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -51,6 +53,16 @@ class JobConflictBridgeError(BridgeError):
 JOBS_LOCK = threading.Lock()
 JOBS: dict[str, dict[str, Any]] = {}
 ACTIVE_RUN_JOBS: dict[str, str] = {}
+DEFAULT_REVIEW_POLICY = {
+    "cascade": "auto",
+    "plan": "manual",
+    "draft": "manual",
+    "repetition_audit": "auto",
+    "style": "auto",
+    "craft": "auto",
+    "final": "manual",
+    "summary": "auto",
+}
 
 
 def _validate_relative_name(name: str, suffix: str) -> str:
@@ -386,6 +398,8 @@ def _run_job(job_id: str, worker) -> None:
     try:
         result = worker(job_id)
     except Exception as exc:  # pragma: no cover - exercised via API tests instead
+        if _is_validation_failure_message(str(exc)):
+            _append_job_event(job_id, "validation_failed", str(exc))
         _append_job_event(job_id, "job_failed", str(exc))
         _finish_job(job_id, status="failed", error=str(exc))
         return
@@ -434,6 +448,22 @@ def _queue_job(
 
 def get_job(job_id: str) -> dict[str, Any]:
     return _job_snapshot(job_id)
+
+
+def iter_job_events(job_id: str, poll_interval: float = 0.05):
+    sent = 0
+    while True:
+        snapshot = _job_snapshot(job_id)
+        events = snapshot.get("events", [])
+        while sent < len(events):
+            payload = events[sent]
+            body = json.dumps(payload, ensure_ascii=True)
+            yield f"event: {payload.get('event', 'message')}\ndata: {body}\n\n"
+            sent += 1
+
+        if snapshot.get("status") in {"succeeded", "failed"}:
+            return
+        time.sleep(poll_interval)
 
 
 def _validate_step_slot_exists(data: dict[str, Any], chapter: int, step: str) -> None:
@@ -492,6 +522,11 @@ def _response_text(response: dict[str, Any]) -> str:
     return str(content)
 
 
+def _is_validation_failure_message(message: str) -> bool:
+    lowered = message.lower()
+    return "validation failed" in lowered or "invalid prose output" in lowered or "cascade validation failed" in lowered
+
+
 def _steering_prompt(prompt: str, steering_note: str) -> str:
     note = steering_note.strip()
     if not note:
@@ -508,8 +543,8 @@ def _review_policy_for_step(data: dict[str, Any], step: str) -> str:
         return "manual"
     review_policy = run_settings.get("review_policy", {})
     if not isinstance(review_policy, dict):
-        return "manual"
-    return str(review_policy.get(step) or "manual")
+        return DEFAULT_REVIEW_POLICY.get(step, "manual")
+    return str(review_policy.get(step) or DEFAULT_REVIEW_POLICY.get(step, "manual"))
 
 
 def _set_review_state(
@@ -537,6 +572,43 @@ def _set_review_state(
         )
 
     runner_state.update_state(run_id, mutator)
+
+
+def _record_initial_review_checkpoint(
+    run_id: str,
+    chapter: int,
+    step: str,
+    content: str,
+    *,
+    review_required: bool,
+    review_reason: str,
+    review_status: str,
+) -> str | None:
+    candidate_id: str | None = None
+    if review_required:
+        candidate = _candidate_record(
+            chapter=chapter,
+            step=step,
+            source="initial_run",
+            content=content.strip(),
+        )
+        candidate_id = candidate["candidate_id"]
+
+        def add_candidate(data: dict[str, Any]) -> None:
+            _ensure_candidate_outputs(data).append(candidate)
+
+        runner_state.update_state(run_id, add_candidate)
+
+    _set_review_state(
+        run_id,
+        chapter,
+        step,
+        review_required=review_required,
+        review_reason=review_reason,
+        review_status=review_status,
+        approved_candidate_id=None,
+    )
+    return candidate_id
 
 
 def _sync_summary_and_manuscript_if_needed(run_id: str, step: str) -> dict[str, Any] | None:
@@ -650,6 +722,134 @@ def create_run(
     }
 
 
+def _execute_step_once(
+    run_id: str,
+    chapter: int,
+    step: str,
+    *,
+    model_config: str | None,
+    force: bool,
+    job_id: str,
+) -> dict[str, Any]:
+    storage_step = _storage_step_name(step)
+    _append_job_event(job_id, "step_started", f"Step started: {storage_step}", chapter=chapter, step=storage_step)
+    content = runner_cli.execute_step(run_id, chapter, step, model_config=model_config, force=force)
+    _append_job_event(job_id, "step_succeeded", f"Step succeeded: {storage_step}", chapter=chapter, step=storage_step)
+
+    data = _load_run_data(run_id)
+    policy = _review_policy_for_step(data, storage_step)
+    review_required = policy == "manual"
+    review_reason = "policy" if review_required else "manual"
+    review_status = "pending" if review_required else "not_required"
+    candidate_id = _record_initial_review_checkpoint(
+        run_id,
+        chapter,
+        storage_step,
+        content,
+        review_required=review_required,
+        review_reason=review_reason,
+        review_status=review_status,
+    )
+    if review_required:
+        _append_job_event(
+            job_id,
+            "warning",
+            f"Manual review required: {storage_step}",
+            chapter=chapter,
+            step=storage_step,
+            candidate_id=candidate_id,
+            review_policy=policy,
+        )
+
+    return {
+        "step": storage_step,
+        "review_policy": policy,
+        "review_required": review_required,
+        "candidate_id": candidate_id,
+    }
+
+
+def _run_cascade_section_once(
+    run_id: str,
+    section_number: int,
+    *,
+    model_config: str | None,
+    force: bool,
+    job_id: str,
+) -> dict[str, Any]:
+    sections = runner_state.parse_sections(runner_state.get_worksheet(run_id))
+    target = next((item for item in sections if item["section_number"] == section_number), None)
+    if target is None:
+        raise ValidationBridgeError(
+            [{"code": "section_not_found", "message": f"Unknown worksheet section: {section_number}"}]
+        )
+
+    _append_job_event(
+        job_id,
+        "step_started",
+        f"Cascade section started: {target['section_key']}",
+        section_number=section_number,
+        step="cascade",
+    )
+    prompt = runner_renderer.render_cascade(run_id, section_number)
+    _append_job_event(
+        job_id,
+        "prompt_rendered",
+        f"Cascade prompt rendered: {target['section_key']}",
+        section_number=section_number,
+        step="cascade",
+    )
+    result = runner_api.call_step(
+        prompt,
+        "cascade",
+        run_id=run_id,
+        cli_model_config=model_config,
+    )
+    response = result["response"]
+    content = _response_text(response).strip()
+    if not content:
+        raise BridgeError("Cascade returned an empty response body")
+
+    if not force:
+        config = runner_state.load_config()
+        cascade_config = config.get("cascade", {})
+        ok, reason = runner_validator.check_cascade_response(
+            content,
+            target["section_key"],
+            bracket_pattern=cascade_config.get("bracket_pattern", runner_validator.DEFAULT_BRACKET_PATTERN),
+            min_response_length=int(cascade_config.get("min_response_length", 50)),
+        )
+        if not ok:
+            fail_dir = runner_renderer.RENDERED_DIR / run_id
+            fail_dir.mkdir(parents=True, exist_ok=True)
+            fail_path = fail_dir / f"cascade_fail_section_{section_number:02d}_{target['section_key']}.md"
+            fail_path.write_text(content, encoding="utf-8")
+            raise BridgeError(f"Cascade validation failed for {target['section_key']}: {reason}. Saved: {fail_path}")
+
+    runner_state.save_worksheet_section(run_id, target["section_key"], content)
+    runner_metrics.record_call(
+        run_id,
+        None,
+        "cascade",
+        result["model_config"]["model"],
+        response,
+        content=content,
+        extra_fields={"attempts": result["attempts"], "section": target["section_key"]},
+    )
+    runner_metrics.update_cumulative(_load_run_data(run_id).get("project", "project"), run_id)
+    _append_job_event(
+        job_id,
+        "step_succeeded",
+        f"Cascade section completed: {target['section_key']}",
+        section_number=section_number,
+        step="cascade",
+    )
+    return {
+        "section_number": section_number,
+        "section_key": target["section_key"],
+    }
+
+
 def queue_build_manuscript(run_id: str) -> dict[str, Any]:
     def worker(job_id: str) -> dict[str, Any]:
         _append_job_event(job_id, "step_started", "Build manuscript started")
@@ -673,6 +873,48 @@ def queue_build_manuscript(run_id: str) -> dict[str, Any]:
     )
 
 
+def queue_execute_step(
+    run_id: str,
+    chapter: int,
+    step: str,
+    *,
+    model_config: str | None = None,
+    force: bool = False,
+) -> dict[str, Any]:
+    data = _load_run_data(run_id)
+    storage_step = _storage_step_name(step)
+    _validate_step_slot_exists(data, chapter, storage_step)
+
+    def worker(job_id: str) -> dict[str, Any]:
+        step_result = _execute_step_once(
+            run_id,
+            chapter,
+            storage_step,
+            model_config=model_config,
+            force=force,
+            job_id=job_id,
+        )
+        manuscript_path = None
+        if step_result["step"] == "summary":
+            manuscript_path = _display_path(_build_manuscript_for_run(run_id))
+        return {
+            "run_id": run_id,
+            "chapter": chapter,
+            "step": storage_step,
+            "review_policy": step_result["review_policy"],
+            "review_required": step_result["review_required"],
+            "candidate_id": step_result["candidate_id"],
+            "manuscript_path": manuscript_path,
+        }
+
+    return _queue_job(
+        run_id=run_id,
+        job_type="single_step",
+        target={"run_id": run_id, "chapter": chapter, "step": storage_step},
+        worker=worker,
+    )
+
+
 def queue_chapter_auto_run(
     run_id: str,
     chapter: int,
@@ -682,27 +924,27 @@ def queue_chapter_auto_run(
 ) -> dict[str, Any]:
     def worker(job_id: str) -> dict[str, Any]:
         completed_steps: list[str] = []
+        paused_at: dict[str, Any] | None = None
         for step_name in runner_cli.step_order_for_chapter(chapter):
-            canonical_step = _storage_step_name(step_name)
-            _append_job_event(
-                job_id,
-                "step_started",
-                f"Step started: {canonical_step}",
-                chapter=chapter,
-                step=canonical_step,
+            step_result = _execute_step_once(
+                run_id,
+                chapter,
+                step_name,
+                model_config=model_config,
+                force=force,
+                job_id=job_id,
             )
-            runner_cli.execute_step(run_id, chapter, step_name, model_config=model_config, force=force)
-            completed_steps.append(canonical_step)
-            _append_job_event(
-                job_id,
-                "step_succeeded",
-                f"Step succeeded: {canonical_step}",
-                chapter=chapter,
-                step=canonical_step,
-            )
+            completed_steps.append(step_result["step"])
+            if step_result["review_required"]:
+                paused_at = {
+                    "step": step_result["step"],
+                    "review_policy": step_result["review_policy"],
+                    "candidate_id": step_result["candidate_id"],
+                }
+                break
 
         manuscript_path: str | None = None
-        if "summary" in completed_steps:
+        if "summary" in completed_steps and paused_at is None:
             output_path = _build_manuscript_for_run(run_id)
             manuscript_path = _display_path(output_path)
 
@@ -710,6 +952,7 @@ def queue_chapter_auto_run(
             "run_id": run_id,
             "chapter": chapter,
             "completed_steps": completed_steps,
+            "paused_at": paused_at,
             "manuscript_path": manuscript_path,
         }
 
@@ -717,6 +960,66 @@ def queue_chapter_auto_run(
         run_id=run_id,
         job_type="chapter_auto_run",
         target={"run_id": run_id, "chapter": chapter},
+        worker=worker,
+    )
+
+
+def queue_cascade_section(
+    run_id: str,
+    section_number: int,
+    *,
+    model_config: str | None = None,
+    force: bool = False,
+) -> dict[str, Any]:
+    def worker(job_id: str) -> dict[str, Any]:
+        result = _run_cascade_section_once(
+            run_id,
+            section_number,
+            model_config=model_config,
+            force=force,
+            job_id=job_id,
+        )
+        return {"run_id": run_id, **result}
+
+    return _queue_job(
+        run_id=run_id,
+        job_type="cascade_section",
+        target={"run_id": run_id, "section_number": section_number, "step": "cascade"},
+        worker=worker,
+    )
+
+
+def queue_cascade_auto(
+    run_id: str,
+    *,
+    model_config: str | None = None,
+    force: bool = False,
+) -> dict[str, Any]:
+    def worker(job_id: str) -> dict[str, Any]:
+        completed_sections: list[dict[str, Any]] = []
+        while True:
+            next_section = runner_state.get_next_incomplete_section(run_id)
+            if next_section is None:
+                break
+            section_number = int(next_section[0])
+            completed_sections.append(
+                _run_cascade_section_once(
+                    run_id,
+                    section_number,
+                    model_config=model_config,
+                    force=force,
+                    job_id=job_id,
+                )
+            )
+        return {
+            "run_id": run_id,
+            "completed_sections": completed_sections,
+        }
+
+    return _queue_job(
+        run_id=run_id,
+        job_type="cascade_auto",
+        target={"run_id": run_id, "step": "cascade"},
         worker=worker,
     )
 

@@ -42,6 +42,7 @@ def _configure_temp_runner(tmp_path: Path, monkeypatch) -> tuple[Path, Path, Pat
     monkeypatch.setattr(runner_bridge.runner_state, "STATE_DIR", state_dir)
     monkeypatch.setattr(runner_bridge.runner_state, "CONFIG_PATH", config_path)
     monkeypatch.setattr(runner_bridge.runner_manuscript, "OUTPUT_DIR", tmp_path / "output")
+    monkeypatch.setattr(runner_bridge.runner_renderer, "RENDERED_DIR", tmp_path / "rendered")
     with runner_bridge.JOBS_LOCK:
         runner_bridge.JOBS.clear()
         runner_bridge.ACTIVE_RUN_JOBS.clear()
@@ -295,8 +296,42 @@ def test_chapter_auto_run_job_executes_runner_step_order(tmp_path: Path, monkeyp
     assert response.status_code == 200
     job = _wait_for_job(response.json()["job_id"])
     assert job["status"] == "succeeded"
-    assert calls == runner_bridge.runner_cli.step_order_for_chapter(1)
-    assert job["result"]["completed_steps"] == [runner_bridge._storage_step_name(step) for step in calls]
+    assert calls == ["plan"]
+    assert job["result"]["completed_steps"] == ["plan"]
+    assert job["result"]["paused_at"]["step"] == "plan"
+    updated = runner_bridge.runner_state.load_state("auto_run")
+    review_state = updated["studio"]["review_state"]["1"]["plan"]
+    assert review_state["review_status"] == "pending"
+    assert updated["studio"]["candidate_outputs"][0]["source"] == "initial_run"
+
+
+def test_single_step_endpoint_sets_manual_review_checkpoint(tmp_path: Path, monkeypatch) -> None:
+    _, _, worksheet_path = _configure_temp_runner(tmp_path, monkeypatch)
+    _create_temp_run("single_step_run", worksheet_path)
+
+    def seed_existing_chapter(data: dict) -> None:
+        data.setdefault("chapters", {}).setdefault("1", {})["plan"] = "Existing plan."
+
+    runner_bridge.runner_state.update_state("single_step_run", seed_existing_chapter)
+
+    def fake_execute_step(run_id: str, chapter: int, step_name: str, model_config=None, force: bool = False) -> str:
+        del model_config, force
+        storage_step = runner_bridge._storage_step_name(step_name)
+        runner_bridge.runner_state.save_step_output(run_id, chapter, storage_step, f"{storage_step} content")
+        return f"{storage_step} content"
+
+    monkeypatch.setattr(runner_bridge.runner_cli, "execute_step", fake_execute_step)
+
+    response = client.post("/api/runs/single_step_run/chapters/1/steps/draft", json={})
+    assert response.status_code == 200
+    job = _wait_for_job(response.json()["job_id"])
+    assert job["status"] == "succeeded"
+    assert job["result"]["review_required"] is True
+
+    updated = runner_bridge.runner_state.load_state("single_step_run")
+    assert updated["chapters"]["1"]["draft"] == "draft content"
+    assert updated["studio"]["review_state"]["1"]["draft"]["review_status"] == "pending"
+    assert updated["studio"]["candidate_outputs"][0]["source"] == "initial_run"
 
 
 def test_rerun_job_creates_candidate_without_overwriting_canonical_output(tmp_path: Path, monkeypatch) -> None:
@@ -357,6 +392,98 @@ def test_rerun_job_creates_candidate_without_overwriting_canonical_output(tmp_pa
     review_state = updated["studio"]["review_state"]["2"]["draft"]
     assert review_state["review_status"] == "pending"
     assert review_state["review_required"] is True
+
+
+def test_job_events_endpoint_streams_sse_payload(tmp_path: Path, monkeypatch) -> None:
+    _, _, worksheet_path = _configure_temp_runner(tmp_path, monkeypatch)
+    _create_temp_run("events_run", worksheet_path)
+
+    def fake_execute_step(run_id: str, chapter: int, step_name: str, model_config=None, force: bool = False) -> str:
+        del model_config, force
+        storage_step = runner_bridge._storage_step_name(step_name)
+        runner_bridge.runner_state.save_step_output(run_id, chapter, storage_step, "plan content")
+        return "plan content"
+
+    monkeypatch.setattr(runner_bridge.runner_cli, "execute_step", fake_execute_step)
+
+    response = client.post("/api/runs/events_run/chapters/1/steps/plan", json={})
+    job = _wait_for_job(response.json()["job_id"])
+    assert job["status"] == "succeeded"
+
+    stream_response = client.get(f"/api/jobs/{response.json()['job_id']}/events")
+    assert stream_response.status_code == 200
+    assert stream_response.headers["content-type"].startswith("text/event-stream")
+    assert "event: job_queued" in stream_response.text
+    assert "event: job_finished" in stream_response.text
+
+
+def test_run_cascade_section_updates_worksheet(tmp_path: Path, monkeypatch) -> None:
+    _, _, worksheet_path = _configure_temp_runner(tmp_path, monkeypatch)
+    _create_temp_run("cascade_run", worksheet_path)
+
+    monkeypatch.setattr(
+        runner_bridge.runner_api,
+        "call_step",
+        lambda *args, **kwargs: {
+            "response": {"choices": [{"message": {"content": "## section_2_story_concept\n\nResolved section content."}}], "usage": {}},
+            "model_config": {"model": "mock/model"},
+            "attempts": 1,
+        },
+    )
+    monkeypatch.setattr(runner_bridge.runner_metrics, "update_cumulative", lambda *args, **kwargs: {})
+
+    response = client.post("/api/runs/cascade_run/cascade/2", json={})
+    assert response.status_code == 200
+    job = _wait_for_job(response.json()["job_id"])
+    assert job["status"] == "succeeded"
+
+    updated = runner_bridge.runner_state.load_state("cascade_run")
+    assert "Resolved section content." in updated["worksheet"]
+
+
+def test_run_cascade_auto_completes_remaining_sections(tmp_path: Path, monkeypatch) -> None:
+    _, _, worksheet_path = _configure_temp_runner(tmp_path, monkeypatch)
+    _create_temp_run("cascade_auto_run", worksheet_path)
+
+    def seed_incomplete_cascade_section(data: dict) -> None:
+        data["worksheet"] = (
+            "## section_1_required_data_layer\n\n"
+            "### required_data_layer\n"
+            "**brain_dump:** test\n\n"
+            "## section_2_story_concept\n\n"
+            "[PLACEHOLDER SECTION CONTENT THAT SHOULD REMAIN INCOMPLETE]\n"
+        )
+
+    runner_bridge.runner_state.update_state("cascade_auto_run", seed_incomplete_cascade_section)
+
+    monkeypatch.setattr(
+        runner_bridge.runner_api,
+        "call_step",
+        lambda *args, **kwargs: {
+            "response": {
+                "choices": [
+                    {
+                        "message": {
+                            "content": (
+                                "## section_2_story_concept\n\n"
+                                "Auto cascade content with enough detail to satisfy the minimum response length."
+                            )
+                        }
+                    }
+                ],
+                "usage": {},
+            },
+            "model_config": {"model": "mock/model"},
+            "attempts": 1,
+        },
+    )
+    monkeypatch.setattr(runner_bridge.runner_metrics, "update_cumulative", lambda *args, **kwargs: {})
+
+    response = client.post("/api/runs/cascade_auto_run/cascade/auto", json={})
+    assert response.status_code == 200
+    job = _wait_for_job(response.json()["job_id"])
+    assert job["status"] == "succeeded"
+    assert job["result"]["completed_sections"][0]["section_number"] == 2
 
 
 def test_active_job_conflict_blocks_second_run_scoped_job(tmp_path: Path, monkeypatch) -> None:

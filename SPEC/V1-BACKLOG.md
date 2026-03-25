@@ -36,14 +36,21 @@ Purpose: turn the locked v1 slice into an implementation-facing checklist.
   - `PUT /api/runs/{runId}/worksheet/{sectionKey}`
   - `POST /api/runs`
   - `GET /api/jobs/{jobId}`
+  - `GET /api/jobs/{jobId}/events`
   - `POST /api/runs/{runId}/build-manuscript`
+  - `POST /api/runs/{runId}/chapters/{chapter}/steps/{step}`
   - `POST /api/runs/{runId}/chapters/{chapter}/auto`
+  - `POST /api/runs/{runId}/cascade/{sectionNumber}`
+  - `POST /api/runs/{runId}/cascade/auto`
   - `POST /api/runs/{runId}/chapters/{chapter}/steps/{step}/rerun`
   - `POST /api/runs/{runId}/chapters/{chapter}/steps/{step}/approve`
   - `POST /api/runs/{runId}/chapters/{chapter}/steps/{step}/manual-continue`
 - added worksheet validation with H1 rejection and structured validation errors
 - added candidate approval and manual-edit traceability through `studio.review_state` and `studio.candidate_outputs`
 - added polling job records plus run-scoped active-job conflict protection
+- added SSE-compatible job event streaming over the in-process job log
+- added review-policy pause handling for single-step and chapter auto-run execution
+- added queued cascade execution for single sections and auto-completion
 
 ## In Progress
 
@@ -58,16 +65,14 @@ Purpose: turn the locked v1 slice into an implementation-facing checklist.
 - keep expanding the job layer from polling toward SSE events
 - keep execution mutations behind run-scoped conflict protection
 - avoid overwriting canonical outputs during rerun flows
+- keep step and cascade execution behavior aligned with the existing runner validation rules
 
 ## Next
 
 ### Backend orchestration
 
-- `GET /api/jobs/{jobId}/events`
-- `POST /api/runs/{runId}/chapters/{chapter}/steps/{step}`
-- `POST /api/runs/{runId}/cascade/{sectionNumber}`
-- `POST /api/runs/{runId}/cascade/auto`
 - stronger rerun review policy handling and warning/failure events
+- richer live events such as attempt counters and rendered-prompt milestones for chapter steps
 - optional cancellation handling for long-running jobs
 
 ### Frontend shell

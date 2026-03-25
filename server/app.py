@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from . import runner_bridge
 
@@ -30,6 +30,16 @@ class CreateRunRequest(BaseModel):
 
 
 class ChapterAutoRunRequest(BaseModel):
+    model_config_name: str | None = Field(default=None, alias="model_config")
+    force: bool = False
+
+
+class StepRunRequest(BaseModel):
+    model_config_name: str | None = Field(default=None, alias="model_config")
+    force: bool = False
+
+
+class CascadeRunRequest(BaseModel):
     model_config_name: str | None = Field(default=None, alias="model_config")
     force: bool = False
 
@@ -178,6 +188,16 @@ def get_job(job_id: str) -> dict[str, object]:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+@app.get("/api/jobs/{job_id}/events")
+def get_job_events(job_id: str):
+    try:
+        runner_bridge.get_job(job_id)
+        stream = runner_bridge.iter_job_events(job_id)
+    except runner_bridge.BridgeError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return StreamingResponse(stream, media_type="text/event-stream")
+
+
 @app.post("/api/runs/{run_id}/build-manuscript")
 def build_manuscript(run_id: str) -> dict[str, object]:
     try:
@@ -197,6 +217,66 @@ def auto_run_chapter(run_id: str, chapter: int, request: ChapterAutoRunRequest) 
         return runner_bridge.queue_chapter_auto_run(
             run_id=run_id,
             chapter=chapter,
+            model_config=request.model_config_name,
+            force=request.force,
+        )
+    except runner_bridge.JobConflictBridgeError as exc:
+        return JSONResponse(
+            status_code=409,
+            content={"status": "active_job_conflict", "run_id": exc.run_id, "active_job_id": exc.active_job_id},
+        )
+    except runner_bridge.ValidationBridgeError as exc:
+        return JSONResponse(status_code=400, content={"status": "validation_error", "errors": exc.errors})
+    except runner_bridge.BridgeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/runs/{run_id}/chapters/{chapter}/steps/{step}")
+def run_single_step(run_id: str, chapter: int, step: str, request: StepRunRequest) -> dict[str, object]:
+    try:
+        return runner_bridge.queue_execute_step(
+            run_id=run_id,
+            chapter=chapter,
+            step=step,
+            model_config=request.model_config_name,
+            force=request.force,
+        )
+    except runner_bridge.JobConflictBridgeError as exc:
+        return JSONResponse(
+            status_code=409,
+            content={"status": "active_job_conflict", "run_id": exc.run_id, "active_job_id": exc.active_job_id},
+        )
+    except runner_bridge.ValidationBridgeError as exc:
+        return JSONResponse(status_code=400, content={"status": "validation_error", "errors": exc.errors})
+    except runner_bridge.BridgeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/runs/{run_id}/cascade/auto")
+def run_cascade_auto(run_id: str, request: CascadeRunRequest) -> dict[str, object]:
+    try:
+        return runner_bridge.queue_cascade_auto(
+            run_id=run_id,
+            model_config=request.model_config_name,
+            force=request.force,
+        )
+    except runner_bridge.JobConflictBridgeError as exc:
+        return JSONResponse(
+            status_code=409,
+            content={"status": "active_job_conflict", "run_id": exc.run_id, "active_job_id": exc.active_job_id},
+        )
+    except runner_bridge.ValidationBridgeError as exc:
+        return JSONResponse(status_code=400, content={"status": "validation_error", "errors": exc.errors})
+    except runner_bridge.BridgeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/runs/{run_id}/cascade/{section_number}")
+def run_cascade_section(run_id: str, section_number: int, request: CascadeRunRequest) -> dict[str, object]:
+    try:
+        return runner_bridge.queue_cascade_section(
+            run_id=run_id,
+            section_number=section_number,
             model_config=request.model_config_name,
             force=request.force,
         )
