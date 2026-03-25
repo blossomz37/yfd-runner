@@ -12,9 +12,12 @@ The runner is the current execution engine. The top-level spec documents describ
 ```text
 .
 ├── README.md                  # Root overview and setup
-├── SPEC.md                    # Product spec for YFD Studio
-├── SPEC-CSS.md                # Chosen visual-system direction
-├── SPEC-CSS-MOCKUPS.html      # Visual mockups for the CSS spec
+├── SPEC/                      # Product and design specs
+│   ├── SPEC.md
+│   ├── SPEC-requirements.md
+│   ├── SPEC-implementation.md
+│   ├── SPEC-CSS-MOCKUPS-v2.md
+│   └── SPEC-CSS-MOCKUPS.html
 ├── CLAUDE.md                  # Working repo notes and command reference
 ├── worksheet-template.md      # Story worksheet template
 ├── user-commands.md           # Short command note
@@ -49,9 +52,11 @@ Chapter 1 skips the repetition pass because there are no earlier chapters to com
 
 ## Current Planning Docs
 
-- [SPEC.md](/Users/carlo/claude-cowork-ghost-draft-npe/SPEC.md): product spec for the local web control plane
-- [SPEC-CSS.md](/Users/carlo/claude-cowork-ghost-draft-npe/SPEC-CSS.md): visual system spec, currently locked to `Option C: Hybrid Editorial Console`
-- [SPEC-CSS-MOCKUPS.html](/Users/carlo/claude-cowork-ghost-draft-npe/SPEC-CSS-MOCKUPS.html): mockups that support the CSS direction
+- [SPEC.md](./SPEC/SPEC.md): product spec for the local web control plane
+- [SPEC-requirements.md](./SPEC/SPEC-requirements.md): functional requirements and API details
+- [SPEC-implementation.md](./SPEC/SPEC-implementation.md): implementation, scope, and delivery notes
+- [SPEC-CSS-MOCKUPS-v2.md](./SPEC/SPEC-CSS-MOCKUPS-v2.md): mockup revision brief and notes
+- [SPEC-CSS-MOCKUPS.html](./SPEC/SPEC-CSS-MOCKUPS.html): HTML mockups for the selected visual direction
 
 ## Setup
 
@@ -127,7 +132,7 @@ Show run stats:
 python runner.py --run <run_id> --stats
 ```
 
-For a fuller command reference, see [yfd-runner/user-commands.md](/Users/carlo/claude-cowork-ghost-draft-npe/yfd-runner/user-commands.md).
+For a fuller command reference, see [yfd-runner/user-commands.md](./yfd-runner/user-commands.md).
 
 ## Tests
 
