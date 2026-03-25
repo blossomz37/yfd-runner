@@ -1,0 +1,75 @@
+You are writing a chapter summary for Chapter `{{ current_chapter }}` that will be appended to the running chapter_summaries variable. This summary is used by future prompts to understand what has happened in the story without re-reading full chapters.
+
+Read the final chapter:
+
+[Final Chapter {{ current_chapter }}]
+
+`{{ chapter_content }}`
+
+[/Final Chapter {{ current_chapter }}]
+
+[Existing Chapter Summaries]
+
+`{{ chapter_summaries }}`
+
+[/Existing Chapter Summaries]
+
+Rules:
+
+- Write in present tense, third person.
+- Target 300-500 words.
+- Do NOT editorialize or evaluate quality. State what happens.
+
+REQUIRED OUTPUT - your summary must cover ALL of the following:
+
+A) PLOT EVENTS
+
+- What happened in this chapter, in order, as a narrative summary
+- Key decisions made by characters and why
+- Key information revealed or discovered
+
+B) CHARACTER STATE CHANGES
+
+- How each major character's emotional state changed from the start to end of this chapter
+- Any relationship shifts (trust gained, trust broken, alliances formed, conflicts escalated)
+
+C) DOORS CLOSED
+
+- What is now permanently true that was not true before this chapter
+- What options, escapes, or reversals are no longer available
+- What the characters now know that they cannot un-know
+
+D) OPEN THREADS ENTERING NEXT CHAPTER
+
+- Unresolved questions or tensions carrying forward
+- Promises made to the reader that have not yet paid off
+- The single most important "therefore" that makes the next chapter necessary
+
+E) CONTINUITY ANCHORS
+
+- Time: What time/day is it at the end of this chapter?
+- Location: Where are the major characters physically?
+- Resources: Any changes to what characters have or lack (money, weapons, allies, information, health)
+
+F) GHOST DRAFT CHANGES (a ghost draft is information the reader feels but doesn't see on the page)
+
+- Record only chapter deltas that should quietly change future voice, subtext, behavior, and perception.
+- Capture shifts in private logic: fears, wants, refusals, resentments, protections, denials.
+- Add any new triggers, humiliations, obsessions, loyalties, grudges, debts, desires, vulnerabilities.
+- Note changed reads of others: suspicion, idealization, misreading, power math, trust, erotic or social exposure.
+- Flag patterns reinforced or broken: masks, habits of control, retreat, performance, sabotage.
+- List newly charged objects, places, phrases, memories, injuries, symbols.
+- Mark any status or leverage shift that should alter future scene behavior and dialogue.
+- No diagnosis. No obvious psychology.
+
+
+Format your summary as:
+
+## Chapter {{ current_chapter }} Summary
+
+[Your summary following the structure above]
+
+This summary will be appended directly to `{{ chapter_summaries }}`.
+
+***
+Write only the summary.

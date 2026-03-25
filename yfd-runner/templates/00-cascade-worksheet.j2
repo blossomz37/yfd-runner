@@ -1,0 +1,78 @@
+Please read the following information:
+
+[BEGIN INSTRUCTIONS]
+You are developing a [STORY DOSSIER] using a Narrative Physics Engine approach, based on the Required Data Layer provided by the author.
+
+Assume the author has included **all known story information** (characters, plot intentions, outcomes, world details, constraints) in the Required Data Layer or upstream sections.
+
+Your task is to complete **only** the [WORKSHEET SECTION] shown at the end of this prompt.
+
+Do **not** edit, expand, reinterpret, or complete any other part of the [STORY DOSSIER].
+
+This worksheet section may define:
+
+- narrative laws
+- force relationships
+- pressure behavior
+- structural constraints
+- or derived applications of upstream decisions
+
+Treat this section as part of a **cascade system**, not a standalone summary.
+
+---
+
+### GENERAL RULES
+
+- Fill in all [BRACKETED] fields that appear **within the [WORKSHEET SECTION] only**.
+- Follow all directions inside brackets precisely, then remove the brackets in your final text.
+- Maintain the abstraction level appropriate to this section:
+    - If the section defines laws, do NOT include story events or character specifics.
+    - If the section applies laws, derive outcomes from upstream constraints.
+- Respect act_count and chapter_count from the Required Data Layer.
+    - If an act or subsection is not applicable, explicitly write NOT_APPLICABLE.
+- Be decisive instead of presenting multiple options for plot points in your final response, you may use reasoning steps to evaluate more than one option, but the final response should be decisive.
+
+Return the section heading (`## section_N_key`) on the first line, followed by the completed section text.
+Do not include any other content outside of the [WORKSHEET SECTION].
+GLOBAL INSTRUCTIONS FOR ALL SECTIONS:
+You may EXPAND any section you are actively working on as appropriate for the complexity, genre, and scope of the story.
+Expansion should add clarity, structure, and usefulness-never filler.
+Maintain the intent and abstraction level of each section.
+Do not expand beyond what meaningfully serves the story.
+
+---
+
+### INSTRUCTION PRIORITY
+
+If any guidance appears to conflict:
+
+1. [REQUIRED DATA LAYER] instructions take top priority.
+2. Then [WORKSHEET SECTION].
+3. Then these [INSTRUCTIONS].
+
+[END INSTRUCTIONS]
+
+---
+
+[BEGIN REQUIRED DATA LAYER]
+{{ instructions }}
+[END REQUIRED DATA LAYER]
+
+Number of chapters you are working with:
+[TARGET CHAPTERS]
+{{ total_chapters }}
+[/TARGET CHAPTERS]
+---
+
+[BEGIN STORY DOSSIER]
+{{ worksheet }}
+[END STORY DOSSIER]
+
+---
+
+[BEGIN WORKSHEET SECTION]
+IMPORTANT: You are working **only** on this section.
+Do not update other parts of the STORY DOSSIER.
+
+{{ context }}
+[END WORKSHEET SECTION]

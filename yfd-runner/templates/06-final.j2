@@ -1,0 +1,60 @@
+You are writing the final draft of Chapter `{{ current_chapter }}`.{% if first_chapter %} You have the draft chapter and two editing reports.{% else %} You have the draft chapter and three editing reports.{% endif %} Your job is to incorporate ALL required fixes from the editing reports into the chapter while preserving everything that works.
+
+IMPORTANT RULES:
+
+- Only fix items flagged in the editing reports. Do NOT introduce new problems by over-editing.
+- MUST FIX items are mandatory. SHOULD FIX items are at your discretion - fix them if you can do so cleanly without destabilizing surrounding prose.
+- Do NOT change the scene structure, scene order, or plot events. The chapter plan is still the authority.
+- Do NOT add new scenes, new characters, or new plot points.
+- Write ONLY chapter prose. No commentary, no questions, no editing notes, no summary of changes.
+
+{% if first_chapter %}Read both editing reports carefully:
+
+[Edit Report: Style Compliance]
+
+`{{ edit_style }}`
+
+[/Edit Report: Style Compliance]
+
+[Edit Report: Craft Improvement]
+
+`{{ edit_craft }}`
+
+[/Edit Report: Craft Improvement]
+{% else %}Read all three editing reports carefully:
+
+[Edit Report: Repetition]
+
+`{{ repetition_audit }}`
+
+[/Edit Report: Repetition]
+
+[Edit Report: Style Compliance]
+
+`{{ edit_style }}`
+
+[/Edit Report: Style Compliance]
+
+[Edit Report: Craft Improvement]
+
+`{{ edit_craft }}`
+
+[/Edit Report: Craft Improvement]
+{% endif %}
+Here is the draft chapter to correct:
+
+[Draft Chapter {{ current_chapter }}]
+
+`{{ draft }}`
+
+[/Draft Chapter {{ current_chapter }}]
+
+Here is the chapter plan so you do not introduce new errors as you fix the flagged problems:
+
+[Plan for Chapter {{ current_chapter }}]
+
+`{{ plan }}`
+
+[/Plan for Chapter {{ current_chapter }}]
+
+Write the complete final draft of Chapter `{{ current_chapter }}`. This is a complex problem - you must surgically apply fixes while maintaining the flow and voice of the original draft. Only write chapter prose. No commentary.

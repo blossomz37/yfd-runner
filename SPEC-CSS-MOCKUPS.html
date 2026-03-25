@@ -1,0 +1,1057 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>YFD Studio Mockups</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --page-bg: #efe8dd;
+        --page-ink: #201c19;
+        --page-muted: #70675f;
+        --border: rgba(32, 28, 25, 0.12);
+        --shadow: 0 18px 40px rgba(24, 20, 16, 0.12);
+        --radius-xl: 28px;
+        --radius-lg: 20px;
+        --radius-md: 14px;
+        --radius-sm: 10px;
+        --sans: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+        --serif: Georgia, "Times New Roman", serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at top left, rgba(196, 169, 126, 0.18), transparent 28%),
+          radial-gradient(circle at top right, rgba(85, 108, 150, 0.12), transparent 24%),
+          linear-gradient(180deg, #f7f2ea 0%, var(--page-bg) 100%);
+        color: var(--page-ink);
+        font-family: var(--sans);
+      }
+
+      .wrap {
+        width: min(1480px, calc(100vw - 40px));
+        margin: 0 auto;
+        padding: 36px 0 80px;
+      }
+
+      .hero {
+        display: grid;
+        gap: 10px;
+        margin-bottom: 28px;
+      }
+
+      .eyebrow {
+        font-size: 12px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--page-muted);
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(34px, 4vw, 56px);
+        line-height: 0.95;
+        font-family: var(--serif);
+        font-weight: 600;
+      }
+
+      .intro {
+        max-width: 760px;
+        color: var(--page-muted);
+        font-size: 16px;
+        line-height: 1.6;
+      }
+
+      .grid {
+        display: grid;
+        gap: 28px;
+      }
+
+      .concept {
+        border: 1px solid var(--border);
+        border-radius: var(--radius-xl);
+        overflow: hidden;
+        box-shadow: var(--shadow);
+        background: rgba(255, 255, 255, 0.75);
+        backdrop-filter: blur(8px);
+      }
+
+      .concept-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        align-items: end;
+        padding: 22px 24px 18px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      .concept-title {
+        margin: 0;
+        font-size: 26px;
+        line-height: 1;
+      }
+
+      .concept-subtitle {
+        margin: 8px 0 0;
+        max-width: 760px;
+        font-size: 14px;
+        line-height: 1.5;
+        opacity: 0.78;
+      }
+
+      .concept-notes {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: flex-end;
+      }
+
+      .pill {
+        padding: 7px 11px;
+        border-radius: 999px;
+        font-size: 12px;
+        letter-spacing: 0.03em;
+        border: 1px solid currentColor;
+        opacity: 0.82;
+      }
+
+      .mockup {
+        padding: 24px;
+      }
+
+      .screen {
+        min-height: 760px;
+        border-radius: 24px;
+        overflow: hidden;
+        display: grid;
+        grid-template-columns: 260px minmax(0, 1fr) 300px;
+        box-shadow: inset 0 1px rgba(255, 255, 255, 0.2);
+      }
+
+      .sidebar,
+      .main,
+      .rail {
+        min-width: 0;
+      }
+
+      .topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 18px;
+        padding: 16px 18px;
+      }
+
+      .brand {
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .toolbar {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      .ghost,
+      .solid,
+      .status-chip {
+        border-radius: 999px;
+        font-size: 12px;
+        line-height: 1;
+        padding: 9px 12px;
+      }
+
+      .layout-stack {
+        display: grid;
+        gap: 16px;
+        padding: 0 18px 18px;
+      }
+
+      .panel {
+        border-radius: 18px;
+        padding: 16px;
+      }
+
+      .panel h3,
+      .panel h4 {
+        margin: 0 0 10px;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.09em;
+      }
+
+      .nav-list,
+      .meta-list,
+      .chapter-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .nav-item,
+      .meta-item,
+      .chapter-item {
+        padding: 11px 12px;
+        border-radius: 12px;
+        font-size: 14px;
+      }
+
+      .workspace {
+        display: grid;
+        grid-template-rows: auto auto minmax(0, 1fr);
+        min-width: 0;
+      }
+
+      .workspace-head {
+        padding: 20px 22px 8px;
+      }
+
+      .workspace-title {
+        margin: 0;
+        font-size: 30px;
+        line-height: 1;
+      }
+
+      .workspace-copy {
+        margin: 10px 0 0;
+        font-size: 14px;
+        line-height: 1.5;
+        max-width: 72ch;
+      }
+
+      .hero-stats {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+        padding: 12px 22px 18px;
+      }
+
+      .stat {
+        border-radius: 16px;
+        padding: 14px 14px 12px;
+      }
+
+      .stat-label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        opacity: 0.7;
+      }
+
+      .stat-value {
+        margin-top: 8px;
+        font-size: 24px;
+        font-weight: 700;
+      }
+
+      .work-columns {
+        min-height: 0;
+        display: grid;
+        grid-template-columns: 1.35fr 1fr;
+        gap: 16px;
+        padding: 0 22px 22px;
+      }
+
+      .editor {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        min-height: 0;
+      }
+
+      .panel-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+
+      .codebox,
+      .docbox,
+      .timeline,
+      .reviewbox {
+        border-radius: 16px;
+        min-height: 0;
+      }
+
+      .codebox {
+        font-family: var(--mono);
+        font-size: 12px;
+        line-height: 1.65;
+        white-space: pre-wrap;
+        padding: 16px;
+      }
+
+      .docbox {
+        padding: 16px;
+        font-size: 14px;
+        line-height: 1.65;
+      }
+
+      .docbox p:last-child {
+        margin-bottom: 0;
+      }
+
+      .timeline,
+      .reviewbox {
+        padding: 16px;
+      }
+
+      .timeline-item {
+        padding: 12px 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.12);
+        font-size: 13px;
+      }
+
+      .timeline-item:first-child {
+        border-top: 0;
+        padding-top: 0;
+      }
+
+      .mini-label {
+        display: block;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.09em;
+        margin-bottom: 6px;
+        opacity: 0.66;
+      }
+
+      .compare-line {
+        display: grid;
+        gap: 6px;
+        margin-top: 10px;
+      }
+
+      .compare-bar {
+        height: 10px;
+        border-radius: 999px;
+      }
+
+      .swatches {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 10px;
+        padding: 0 24px 24px;
+      }
+
+      .swatch {
+        border-radius: 16px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .swatch-color {
+        height: 64px;
+      }
+
+      .swatch-label {
+        padding: 10px 12px;
+        font-size: 12px;
+      }
+
+      .option-a {
+        background: linear-gradient(180deg, #60503f 0%, #efe2cf 14%, #f5ecde 100%);
+        color: #2a231d;
+      }
+
+      .option-a .concept-header {
+        background: linear-gradient(135deg, rgba(95, 67, 42, 0.94), rgba(191, 160, 118, 0.88));
+        color: #fff7ef;
+      }
+
+      .option-a .screen {
+        background: #f8f1e6;
+      }
+
+      .option-a .sidebar {
+        background: linear-gradient(180deg, #efe1cd, #e8d8c1);
+        border-right: 1px solid rgba(89, 67, 42, 0.14);
+      }
+
+      .option-a .main {
+        background: #fbf7f0;
+      }
+
+      .option-a .rail {
+        background: #f2e7d8;
+        border-left: 1px solid rgba(89, 67, 42, 0.14);
+      }
+
+      .option-a .workspace-title,
+      .option-a .concept-title {
+        font-family: var(--serif);
+        font-weight: 600;
+      }
+
+      .option-a .ghost {
+        background: rgba(89, 67, 42, 0.08);
+        color: #5d4a38;
+      }
+
+      .option-a .solid {
+        background: #8e6842;
+        color: #fff7ef;
+      }
+
+      .option-a .status-chip {
+        background: #d9c0a4;
+        color: #5b4128;
+      }
+
+      .option-a .panel,
+      .option-a .stat,
+      .option-a .codebox,
+      .option-a .docbox,
+      .option-a .timeline,
+      .option-a .reviewbox {
+        background: rgba(255, 251, 245, 0.85);
+        border: 1px solid rgba(93, 74, 56, 0.11);
+      }
+
+      .option-a .nav-item.active,
+      .option-a .chapter-item.active {
+        background: #e0ccb5;
+        color: #483526;
+      }
+
+      .option-a .compare-bar {
+        background: linear-gradient(90deg, #8e6842, #c6a47b);
+      }
+
+      .option-a .swatch-label {
+        background: #fffaf3;
+      }
+
+      .option-b {
+        background: linear-gradient(180deg, #0f1824 0%, #161f2c 100%);
+        color: #d7e4f5;
+      }
+
+      .option-b .concept-header {
+        background: linear-gradient(135deg, rgba(15, 24, 36, 0.96), rgba(42, 68, 94, 0.94));
+        color: #ebf5ff;
+      }
+
+      .option-b .screen {
+        background: #111925;
+      }
+
+      .option-b .sidebar {
+        background: #0d1420;
+        border-right: 1px solid rgba(165, 193, 223, 0.1);
+      }
+
+      .option-b .main {
+        background: #121b28;
+      }
+
+      .option-b .rail {
+        background: #0f1722;
+        border-left: 1px solid rgba(165, 193, 223, 0.1);
+      }
+
+      .option-b .concept-title,
+      .option-b .workspace-title {
+        font-weight: 700;
+        letter-spacing: -0.04em;
+      }
+
+      .option-b .ghost {
+        background: rgba(115, 162, 212, 0.12);
+        color: #a9c8eb;
+      }
+
+      .option-b .solid {
+        background: #59a6ff;
+        color: #0c1621;
+      }
+
+      .option-b .status-chip {
+        background: rgba(96, 233, 203, 0.16);
+        color: #86f3d8;
+      }
+
+      .option-b .panel,
+      .option-b .stat,
+      .option-b .codebox,
+      .option-b .docbox,
+      .option-b .timeline,
+      .option-b .reviewbox {
+        background: rgba(18, 29, 43, 0.92);
+        border: 1px solid rgba(128, 170, 214, 0.12);
+      }
+
+      .option-b .nav-item.active,
+      .option-b .chapter-item.active {
+        background: rgba(89, 166, 255, 0.16);
+        color: #dff1ff;
+      }
+
+      .option-b .compare-bar {
+        background: linear-gradient(90deg, #59a6ff, #86f3d8);
+      }
+
+      .option-b .swatch-label {
+        background: #0d1420;
+      }
+
+      .option-c {
+        background: linear-gradient(180deg, #d2d8d3 0%, #f1efe8 16%, #f7f6f2 100%);
+        color: #20251f;
+      }
+
+      .option-c .concept-header {
+        background: linear-gradient(135deg, rgba(46, 59, 51, 0.96), rgba(121, 142, 126, 0.9));
+        color: #f1f4ee;
+      }
+
+      .option-c .screen {
+        background: #eef1ec;
+      }
+
+      .option-c .sidebar {
+        background: #dde4db;
+        border-right: 1px solid rgba(52, 66, 58, 0.12);
+      }
+
+      .option-c .main {
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.56), rgba(255, 255, 255, 0.82)),
+          #f4f3ef;
+      }
+
+      .option-c .rail {
+        background: #e3e7e1;
+        border-left: 1px solid rgba(52, 66, 58, 0.12);
+      }
+
+      .option-c .workspace-title {
+        font-size: 31px;
+        letter-spacing: -0.045em;
+      }
+
+      .option-c .ghost {
+        background: rgba(63, 92, 73, 0.08);
+        color: #445a4b;
+      }
+
+      .option-c .solid {
+        background: #56715d;
+        color: #f6f8f4;
+      }
+
+      .option-c .status-chip {
+        background: rgba(183, 158, 89, 0.2);
+        color: #6c5823;
+      }
+
+      .option-c .panel,
+      .option-c .stat,
+      .option-c .codebox,
+      .option-c .docbox,
+      .option-c .timeline,
+      .option-c .reviewbox {
+        background: rgba(255, 255, 255, 0.74);
+        border: 1px solid rgba(52, 66, 58, 0.1);
+      }
+
+      .option-c .nav-item.active,
+      .option-c .chapter-item.active {
+        background: rgba(88, 113, 93, 0.14);
+        color: #32453a;
+      }
+
+      .option-c .compare-bar {
+        background: linear-gradient(90deg, #56715d, #b79e59);
+      }
+
+      .option-c .swatch-label {
+        background: #fbfcf8;
+      }
+
+      .meta-quiet {
+        opacity: 0.68;
+      }
+
+      @media (max-width: 1180px) {
+        .screen {
+          grid-template-columns: 220px minmax(0, 1fr);
+        }
+
+        .rail {
+          display: none;
+        }
+      }
+
+      @media (max-width: 860px) {
+        .wrap {
+          width: min(100vw - 20px, 1400px);
+          padding-top: 22px;
+        }
+
+        .mockup {
+          padding: 14px;
+        }
+
+        .screen {
+          grid-template-columns: 1fr;
+          min-height: auto;
+        }
+
+        .sidebar,
+        .rail {
+          display: none;
+        }
+
+        .hero-stats,
+        .work-columns,
+        .swatches {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <section class="hero">
+        <div class="eyebrow">Preliminary Visual Mockups</div>
+        <h1>Three directions for YFD Studio.</h1>
+        <div class="intro">
+          These are not final screens. They are fast concept mockups to compare tone, layout, and color language.
+          Each one uses the same underlying product structure: left navigation, central workspace, and a right-side inspector.
+        </div>
+      </section>
+
+      <div class="grid">
+        <section class="concept option-a">
+          <div class="concept-header">
+            <div>
+              <h2 class="concept-title">Option A — Editorial Workbench</h2>
+              <p class="concept-subtitle">
+                Warm, literary, and text-first. This version leans into the writing-tool identity and makes prompts,
+                prose, and dossier content feel document-centered rather than dashboard-centered.
+              </p>
+            </div>
+            <div class="concept-notes">
+              <span class="pill">Warm neutrals</span>
+              <span class="pill">Serif accent</span>
+              <span class="pill">Soft panels</span>
+            </div>
+          </div>
+          <div class="mockup">
+            <div class="screen">
+              <aside class="sidebar">
+                <div class="topbar">
+                  <div class="brand">YFD Studio</div>
+                </div>
+                <div class="layout-stack">
+                  <div class="panel">
+                    <h3>Workspace</h3>
+                    <div class="nav-list">
+                      <div class="nav-item active">Runs</div>
+                      <div class="nav-item">Intake</div>
+                      <div class="nav-item">Templates</div>
+                      <div class="nav-item">Models</div>
+                      <div class="nav-item">Outputs</div>
+                    </div>
+                  </div>
+                  <div class="panel">
+                    <h3>Current Run</h3>
+                    <div class="chapter-list">
+                      <div class="chapter-item active">Chapter 03 · Draft</div>
+                      <div class="chapter-item">Chapter 04 · Pending</div>
+                      <div class="chapter-item">Chapter 05 · Pending</div>
+                    </div>
+                  </div>
+                </div>
+              </aside>
+              <main class="main workspace">
+                <div class="workspace-head">
+                  <div class="toolbar">
+                    <span class="status-chip">Review Required</span>
+                    <span class="ghost">Run eaw_001</span>
+                    <span class="ghost">Template preview live</span>
+                  </div>
+                  <h3 class="workspace-title">Template Editor</h3>
+                  <p class="workspace-copy meta-quiet">
+                    A gentler, manuscript-adjacent environment. The editor and reading surfaces feel like paper, while
+                    controls recede enough to keep the writing front and center.
+                  </p>
+                </div>
+                <div class="hero-stats">
+                  <div class="stat">
+                    <div class="stat-label">Prompt Tokens</div>
+                    <div class="stat-value">35.5k</div>
+                  </div>
+                  <div class="stat">
+                    <div class="stat-label">Current Step</div>
+                    <div class="stat-value">Draft</div>
+                  </div>
+                  <div class="stat">
+                    <div class="stat-label">Output Words</div>
+                    <div class="stat-value">2,841</div>
+                  </div>
+                  <div class="stat">
+                    <div class="stat-label">State</div>
+                    <div class="stat-value">Paused</div>
+                  </div>
+                </div>
+                <div class="work-columns">
+                  <section class="editor panel">
+                    <div class="panel-head">
+                      <h4>Jinja Template</h4>
+                      <div class="toolbar">
+                        <span class="ghost">Preview</span>
+                        <span class="solid">Save</span>
+                      </div>
+                    </div>
+                    <div class="codebox">{% if first_chapter %}
+[Draft Chapter {{ current_chapter }}]
+
+{{ worksheet }}
+{% else %}
+[Use summaries and prior finals]
+{% endif %}</div>
+                  </section>
+                  <section class="panel">
+                    <div class="panel-head">
+                      <h4>Rendered Prompt</h4>
+                      <span class="ghost">Trimmed worksheet</span>
+                    </div>
+                    <div class="docbox">
+                      <p><strong>Writing Style Rules</strong></p>
+                      <p>Section 8 and section 9 are in scope. Voice stays elegant, emotionally legible, and concrete.</p>
+                      <p>The tone here is calm and literary. This makes long prompt review and prose reading pleasant, but it risks feeling a touch too soft for operational monitoring.</p>
+                    </div>
+                  </section>
+                </div>
+              </main>
+              <aside class="rail">
+                <div class="topbar">
+                  <div class="brand">Inspector</div>
+                  <span class="ghost">Live</span>
+                </div>
+                <div class="layout-stack">
+                  <div class="timeline">
+                    <h4>Loop State</h4>
+                    <div class="timeline-item"><span class="mini-label">Step</span>Draft complete, awaiting approval</div>
+                    <div class="timeline-item"><span class="mini-label">Warning</span>Prompt estimate exceeds soft threshold</div>
+                    <div class="timeline-item"><span class="mini-label">Next</span>Final waits until manual review</div>
+                  </div>
+                  <div class="reviewbox">
+                    <h4>Review Actions</h4>
+                    <div class="toolbar">
+                      <span class="solid">Approve</span>
+                      <span class="ghost">Rerun</span>
+                      <span class="ghost">Edit</span>
+                    </div>
+                    <div class="compare-line">
+                      <span class="mini-label">Mood</span>
+                      <div class="compare-bar"></div>
+                    </div>
+                  </div>
+                </div>
+              </aside>
+            </div>
+          </div>
+          <div class="swatches">
+            <div class="swatch"><div class="swatch-color" style="background:#5c4634"></div><div class="swatch-label">Ink Brown</div></div>
+            <div class="swatch"><div class="swatch-color" style="background:#8e6842"></div><div class="swatch-label">Leather</div></div>
+            <div class="swatch"><div class="swatch-color" style="background:#d9c0a4"></div><div class="swatch-label">Approval Sand</div></div>
+            <div class="swatch"><div class="swatch-color" style="background:#f8f1e6"></div><div class="swatch-label">Paper Surface</div></div>
+            <div class="swatch"><div class="swatch-color" style="background:#efe1cd"></div><div class="swatch-label">Sidebar Parchment</div></div>
+          </div>
+        </section>
+
+        <section class="concept option-b">
+          <div class="concept-header">
+            <div>
+              <h2 class="concept-title">Option B — Precision Control Room</h2>
+              <p class="concept-subtitle">
+                Cooler, denser, and more operational. This version treats YFD as a sequencer and inspection console,
+                with strong segmentation and very explicit system state.
+              </p>
+            </div>
+            <div class="concept-notes">
+              <span class="pill">Cool neutrals</span>
+              <span class="pill">Sharp segmentation</span>
+              <span class="pill">Ops-forward</span>
+            </div>
+          </div>
+          <div class="mockup">
+            <div class="screen">
+              <aside class="sidebar">
+                <div class="topbar">
+                  <div class="brand">YFD / Control</div>
+                </div>
+                <div class="layout-stack">
+                  <div class="panel">
+                    <h3>System</h3>
+                    <div class="nav-list">
+                      <div class="nav-item active">Runs</div>
+                      <div class="nav-item">Jobs</div>
+                      <div class="nav-item">Templates</div>
+                      <div class="nav-item">Models</div>
+                      <div class="nav-item">Validation</div>
+                    </div>
+                  </div>
+                  <div class="panel">
+                    <h3>Runs</h3>
+                    <div class="chapter-list">
+                      <div class="chapter-item active">eaw_001 / ch03 / final</div>
+                      <div class="chapter-item">eaw_001 / ch04 / plan</div>
+                      <div class="chapter-item">branch_dark / ch03 / draft</div>
+                    </div>
+                  </div>
+                </div>
+              </aside>
+              <main class="main workspace">
+                <div class="workspace-head">
+                  <div class="toolbar">
+                    <span class="status-chip">Job Running</span>
+                    <span class="ghost">2 retries configured</span>
+                    <span class="ghost">SSE connected</span>
+                  </div>
+                  <h3 class="workspace-title">Run Dashboard</h3>
+                  <p class="workspace-copy meta-quiet">
+                    The same content model, but treated as an execution system first. Strong contrast, compact cards,
+                    and obvious status signaling make this better for monitoring and debugging.
+                  </p>
+                </div>
+                <div class="hero-stats">
+                  <div class="stat">
+                    <div class="stat-label">Active Jobs</div>
+                    <div class="stat-value">01</div>
+                  </div>
+                  <div class="stat">
+                    <div class="stat-label">Prompt Tokens</div>
+                    <div class="stat-value">35.5k</div>
+                  </div>
+                  <div class="stat">
+                    <div class="stat-label">Warnings</div>
+                    <div class="stat-value">02</div>
+                  </div>
+                  <div class="stat">
+                    <div class="stat-label">Cost</div>
+                    <div class="stat-value">$0.18</div>
+                  </div>
+                </div>
+                <div class="work-columns">
+                  <section class="panel">
+                    <div class="panel-head">
+                      <h4>Step Timeline</h4>
+                      <span class="ghost">ch03</span>
+                    </div>
+                    <div class="timeline">
+                      <div class="timeline-item"><span class="mini-label">Plan</span>Completed in 1 attempt</div>
+                      <div class="timeline-item"><span class="mini-label">Draft</span>Completed, manual review pending</div>
+                      <div class="timeline-item"><span class="mini-label">Final</span>Queued after approval</div>
+                      <div class="timeline-item"><span class="mini-label">Stream</span>warning: prompt exceeds soft threshold</div>
+                    </div>
+                  </section>
+                  <section class="panel">
+                    <div class="panel-head">
+                      <h4>Candidate Compare</h4>
+                      <span class="ghost">draft / 2 candidates</span>
+                    </div>
+                    <div class="docbox">
+                      <p><strong>Candidate A</strong> keeps the original pacing.</p>
+                      <p><strong>Candidate B</strong> applies a steering note to reduce exposition and tighten scene geometry.</p>
+                      <div class="compare-line">
+                        <span class="mini-label">Preference signal</span>
+                        <div class="compare-bar"></div>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+              </main>
+              <aside class="rail">
+                <div class="topbar">
+                  <div class="brand">Inspector</div>
+                  <span class="ghost">Ops</span>
+                </div>
+                <div class="layout-stack">
+                  <div class="panel">
+                    <h4>Validation</h4>
+                    <div class="meta-list">
+                      <div class="meta-item">No H1 headings detected</div>
+                      <div class="meta-item">Sections 8 and 9 trimmed for style step</div>
+                      <div class="meta-item">Retry budget remaining: 1</div>
+                    </div>
+                  </div>
+                  <div class="reviewbox">
+                    <h4>Actions</h4>
+                    <div class="toolbar">
+                      <span class="solid">Approve</span>
+                      <span class="ghost">Pause</span>
+                      <span class="ghost">Cancel</span>
+                    </div>
+                  </div>
+                </div>
+              </aside>
+            </div>
+          </div>
+          <div class="swatches">
+            <div class="swatch"><div class="swatch-color" style="background:#0d1420"></div><div class="swatch-label">Base Shell</div></div>
+            <div class="swatch"><div class="swatch-color" style="background:#121b28"></div><div class="swatch-label">Main Surface</div></div>
+            <div class="swatch"><div class="swatch-color" style="background:#59a6ff"></div><div class="swatch-label">Primary Blue</div></div>
+            <div class="swatch"><div class="swatch-color" style="background:#86f3d8"></div><div class="swatch-label">Running Mint</div></div>
+            <div class="swatch"><div class="swatch-color" style="background:#dff1ff"></div><div class="swatch-label">High Contrast Ink</div></div>
+          </div>
+        </section>
+
+        <section class="concept option-c">
+          <div class="concept-header">
+            <div>
+              <h2 class="concept-title">Option C — Hybrid Editorial Console</h2>
+              <p class="concept-subtitle">
+                A middle path: calm content surfaces, but with more operational structure than the editorial version.
+                This is the most likely fit if YFD needs to feel both author-facing and execution-aware.
+              </p>
+            </div>
+            <div class="concept-notes">
+              <span class="pill">Balanced structure</span>
+              <span class="pill">Warm-neutral base</span>
+              <span class="pill">Best default</span>
+            </div>
+          </div>
+          <div class="mockup">
+            <div class="screen">
+              <aside class="sidebar">
+                <div class="topbar">
+                  <div class="brand">YFD Studio</div>
+                </div>
+                <div class="layout-stack">
+                  <div class="panel">
+                    <h3>Navigation</h3>
+                    <div class="nav-list">
+                      <div class="nav-item active">Templates</div>
+                      <div class="nav-item">Runs</div>
+                      <div class="nav-item">Intake</div>
+                      <div class="nav-item">Models</div>
+                      <div class="nav-item">Outputs</div>
+                    </div>
+                  </div>
+                  <div class="panel">
+                    <h3>Current View</h3>
+                    <div class="chapter-list">
+                      <div class="chapter-item active">04-edit-style.j2</div>
+                      <div class="chapter-item">02-draft.j2</div>
+                      <div class="chapter-item">06-final.j2</div>
+                    </div>
+                  </div>
+                </div>
+              </aside>
+              <main class="main workspace">
+                <div class="workspace-head">
+                  <div class="toolbar">
+                    <span class="status-chip">Prompt Preview Ready</span>
+                    <span class="ghost">Run partial_ch2_20260319</span>
+                    <span class="ghost">Step style</span>
+                  </div>
+                  <h3 class="workspace-title">Template + Output Review</h3>
+                  <p class="workspace-copy meta-quiet">
+                    This direction lets the app feel composed and productized while still keeping prompts, dossier text,
+                    and prose outputs comfortable to read for long periods.
+                  </p>
+                </div>
+                <div class="hero-stats">
+                  <div class="stat">
+                    <div class="stat-label">Template</div>
+                    <div class="stat-value">04</div>
+                  </div>
+                  <div class="stat">
+                    <div class="stat-label">Rendered Scope</div>
+                    <div class="stat-value">S8+S9</div>
+                  </div>
+                  <div class="stat">
+                    <div class="stat-label">Review Policy</div>
+                    <div class="stat-value">Manual</div>
+                  </div>
+                  <div class="stat">
+                    <div class="stat-label">Branch</div>
+                    <div class="stat-value">Base</div>
+                  </div>
+                </div>
+                <div class="work-columns">
+                  <section class="editor panel">
+                    <div class="panel-head">
+                      <h4>Prompt Source</h4>
+                      <div class="toolbar">
+                        <span class="ghost">Diff</span>
+                        <span class="solid">Preview</span>
+                      </div>
+                    </div>
+                    <div class="codebox">Refer to section_8_writing_style_rules
+and section_9_genre_lens in the worksheet:
+
+{{ worksheet }}
+
+Only flag actual rule violations.</div>
+                  </section>
+                  <section class="panel">
+                    <div class="panel-head">
+                      <h4>Output Inspector</h4>
+                      <span class="ghost">Candidate B</span>
+                    </div>
+                    <div class="docbox">
+                      <p><strong>Summary:</strong> strong balance between polished reading surfaces and clear pipeline controls.</p>
+                      <p><strong>Tradeoff:</strong> less atmospheric than Option A, less immediately operational than Option B, but probably the safest product foundation.</p>
+                      <p><strong>Use it if:</strong> the app needs to serve both writing and sequencing equally well.</p>
+                    </div>
+                  </section>
+                </div>
+              </main>
+              <aside class="rail">
+                <div class="topbar">
+                  <div class="brand">Review Rail</div>
+                  <span class="ghost">Balanced</span>
+                </div>
+                <div class="layout-stack">
+                  <div class="panel">
+                    <h4>Live Notes</h4>
+                    <div class="meta-list">
+                      <div class="meta-item">Worksheet import valid</div>
+                      <div class="meta-item">Candidate output awaiting approval</div>
+                      <div class="meta-item">Output dir: custom path set</div>
+                    </div>
+                  </div>
+                  <div class="reviewbox">
+                    <h4>Review Actions</h4>
+                    <div class="toolbar">
+                      <span class="solid">Approve</span>
+                      <span class="ghost">Rerun Note</span>
+                      <span class="ghost">Branch</span>
+                    </div>
+                    <div class="compare-line">
+                      <span class="mini-label">Visual balance</span>
+                      <div class="compare-bar"></div>
+                    </div>
+                  </div>
+                </div>
+              </aside>
+            </div>
+          </div>
+          <div class="swatches">
+            <div class="swatch"><div class="swatch-color" style="background:#2e3b33"></div><div class="swatch-label">Forest Ink</div></div>
+            <div class="swatch"><div class="swatch-color" style="background:#56715d"></div><div class="swatch-label">Primary Green</div></div>
+            <div class="swatch"><div class="swatch-color" style="background:#b79e59"></div><div class="swatch-label">Review Gold</div></div>
+            <div class="swatch"><div class="swatch-color" style="background:#eef1ec"></div><div class="swatch-label">Shell Mist</div></div>
+            <div class="swatch"><div class="swatch-color" style="background:#ffffff"></div><div class="swatch-label">Reading Surface</div></div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </body>
+</html>

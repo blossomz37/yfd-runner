@@ -1,0 +1,20 @@
+.obsidian/
+yfd-novel-pipeline-v1/
+yfd-novel-pipeline-v2/
+distributed/
+.archive/
+.vscode/
+.env
+
+# macOS filesystem noise
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100/
+.Trashes/
+__MACOSX/
+
+# Python cache artifacts
+__pycache__/
+*.py[cod]

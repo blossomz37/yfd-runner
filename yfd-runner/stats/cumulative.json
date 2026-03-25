@@ -1,0 +1,24 @@
+{
+  "project": "eaw",
+  "runs": [
+    "partial_ch2_20260319",
+    "partial_ch2_20260319_clean",
+    "partial_ch2_20260319_clean2",
+    "partial_ch2_20260319_rerun",
+    "phase11_ch1_auto",
+    "phase11_ch5_render",
+    "phase11_failsave",
+    "phase11_force",
+    "phase11_live",
+    "phase11_offline",
+    "phase3_smoke",
+    "phase9_init_smoke",
+    "trial_cascade",
+    "worksheet_heading_probe"
+  ],
+  "cumulative_tokens_in": 453608,
+  "cumulative_tokens_out": 122365,
+  "cumulative_cost_usd": 0.6174430000000001,
+  "cumulative_word_count": 68255,
+  "last_updated": "2026-03-25T01:32:35Z"
+}

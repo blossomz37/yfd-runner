@@ -1,0 +1,6 @@
+# Direct OpenRouter model entry added after live creative-writing probe.
+# Notes: OpenRouter resolved this to aion-labs/aion-2.0-20260223 with provider AionLabs.
+# Notes: Preferred candidate for spicy prose experiments later; keep out of default routing for now.
+model: aion-labs/aion-2.0
+temperature: 0.9
+max_completion_tokens: 8000

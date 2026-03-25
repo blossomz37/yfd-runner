@@ -1,0 +1,4 @@
+# Cheap, rule-following model reserved primarily for test runs.
+model: openai/gpt-5.4-nano
+temperature: 0.3
+max_completion_tokens: 8000

@@ -1,0 +1,6 @@
+# Direct OpenRouter model entry added after live creative-writing probe.
+# Notes: OpenRouter resolved this alias to anthropic/claude-4.6-sonnet-20260217 with provider Google.
+# Notes: Strong controlled prose and prompt discipline in the quick fiction test.
+model: anthropic/claude-sonnet-4.6
+temperature: 0.9
+max_completion_tokens: 8000

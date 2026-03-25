@@ -1,0 +1,136 @@
+We are writing Chapter `{{ current_chapter }}` of `{{ total_chapters }}`.
+
+{% if first_chapter %}This is **Chapter 1**, so you MUST NOT use or request any past chapters, "recent chapters," or chapter summaries as context.
+{% endif %}
+You are NOT writing prose. You are NOT drafting scenes. You are building a chapter plan that gives the drafting step enough information to write Chapter `{{ current_chapter }}` without continuity errors, wasted beats, or repeated emotional work.
+
+Read carefully:
+
+[Narrative Physics Engine]
+
+`{{ worksheet }}`
+
+[/Narrative Physics Engine]
+
+{% if not first_chapter %}[Finished Chapter Summaries]
+
+`{{ chapter_summaries }}`
+
+[/Finished Chapter Summaries]
+
+[Last 3 Chapters]
+
+`{{ last_chapters_3 }}`
+
+[/Last 3 Chapters]
+
+{% endif %}Rules:
+
+- Do NOT summarize past chapters as a recap.
+- Do NOT write narrative prose or dialogue.
+- Do NOT propose multiple options. Make one decision per field and commit.
+- Prioritize constraints, continuity, and forward-pressure.
+- The chapter outline in the worksheet is the AUTHORITY. Your plan must execute the outline for Chapter `{{ current_chapter }}`, not reinvent it.
+
+IMPORTANT:
+
+This plan must PREVENT REPETITION. Before producing any output, verify:
+
+- This chapter closes at least one emotional or narrative door
+- This chapter increases cost, risk, or exposure for the protagonist
+- This chapter makes at least one future scene impossible
+- No scene in this chapter restates an emotion, conversation, or conflict already proven in prior chapters
+
+REQUIRED OUTPUT - produce ALL of the following sections:
+
+A) LOCKED TRUTHS (canon state entering this chapter)
+
+- Emotional states per major POV character
+- Relationship states - what changed most recently, what is fragile
+- Known facts and revealed information
+- Current goals and current fears per major character
+- Logistics and continuity anchors: time, location, injuries, resources, who is present/absent
+
+B) OPEN LOOPS AND PROMISES
+
+- Unanswered questions currently driving reader momentum
+- Active threats or problems not yet resolved
+- Promised beats implied by the arc or genre that have not yet landed
+
+C) ILLEGAL MOVES (what must NOT happen in this chapter)
+
+- Conversations that have already occurred - do not repeat them
+- Emotional questions already answered - do not re-ask them
+- Regressive behavior that contradicts growth already established
+- World, plot, or timeline violations
+- Any scene that could be removed without altering future chapters
+
+D) CHAPTER PLAN
+
+- **chapter_number:** `{{ current_chapter }}`
+- **chapter_word_count_target:** [pull from estimated_words_per_chapter in worksheet]
+- **pov_character:** [assigned POV for this chapter]
+- **primary_external_objective:** [what must happen in the plot]
+- **primary_internal_objective:** [what must shift emotionally]
+- **door_closed_this_chapter:** [what option, escape, or emotional state becomes permanently unavailable]
+- **risk_increased_this_chapter:** [what cost, danger, or exposure escalates]
+
+For each scene in the chapter:
+
+- **scene_N_setting:** [location and time]
+- **scene_N_characters_present:** [who is in the scene]
+- **scene_N_goal:** [what this scene accomplishes - external and internal]
+- **scene_N_conflict_type:** [interpersonal, internal, environmental, informational, etc.]
+- **scene_N_beats:** [ordered list of what happens]
+- **scene_N_opening_hook:** [how the scene starts]
+- **scene_N_closing_hook:** [how the scene ends - what makes the reader continue]
+- **scene_N_knowledge_delta:** [who learns what]
+- **scene_N_emotional_delta:** [what emotional state changes]
+- **scene_N_axis_movement:** [which tension axes shift and in what direction, with numeric values]
+
+E) CHAPTER MANDATE (forward motion proof)
+
+- 2-4 "end-of-chapter must be true" outcomes
+- Each written as a state change: Before -> After
+- Each must clearly imply why the next chapter becomes necessary
+
+F) FORBIDDEN ACTIONS FOR DRAFTING
+
+- Specific phrasings, scenes, or emotional beats the draft must avoid
+- Any recurring AI writing patterns to watch for given this genre
+
+G) CHAPTER GHOST DRAFT (hidden architecture for this chapter only)
+
+- Build the invisible chapter logic the reader should feel but not be directly told.
+- Do NOT write prose, dialogue, or explanatory psychology.
+- Do NOT restate character profiles in abstract terms unless they are converted into chapter-specific pressure.
+- Focus on what is active in this chapter, not the whole book in general.
+
+For the POV character and each major character affecting this chapter, specify:
+
+- **active private pressure:** the fear, shame, desire, resentment, need, or contradiction driving them here
+- **protective performance:** how they are trying to appear, behave, or control the moment socially
+- **unadmitted truth:** what they cannot say, cannot face, or are misnaming to themselves
+- **reenacted pattern:** what old emotional or relational pattern this chapter silently repeats
+- **sabotage point:** how they risk damaging what they want without fully meaning to
+
+For each scene, translate the ghost draft into scene signals:
+
+- **selective attention:** what this POV notices that reveals the hidden pressure
+- **misreading/distortion:** what this character interprets incorrectly because of identity, history, class, training, wound, or desire
+- **biography-specific behavior:** what they do here that arises from this life, body, profession, era, status training, or private logic - not generic emotion behavior
+- **silence/avoidance:** what they do not say, do not ask, or refuse to name
+- **social pressure underneath the surface action:** the real negotiation beneath the literal scene
+- **narration constraint:** what the prose is forbidden to state directly
+- **timing note:** where the emotional charge should land late, be delayed, or arrive indirectly
+- **negative instruction:** what stock genre behavior or obvious AI move must be avoided in this scene
+
+Ghost-draft rules:
+
+- The subtext must be carried through selection, rhythm, implication, contradiction, omission, and scene pressure.
+- Prefer specificity from this character's conditioning over generic feelings.
+- Ban default tells unless uniquely justified: trembling, breath catching, meaningful eye contact, too-long pauses, silverware straightening, clenched jaws, brittle smiles, phone-checking, etc.
+- The chapter ghost draft must shape how the narration thinks, not just what the characters do.
+- Output the ghost draft as concise planning directives for drafting, not as exposition for the reader.
+
+Output must be concise and constraint-focused. Do not write prose. Do not enumerate alternatives.

@@ -1,0 +1,55 @@
+openrouter:
+  api_key_env: OPENROUTER_API_KEY
+  base_url: https://openrouter.ai/api/v1/chat/completions
+
+project:
+  name: eaw
+  total_chapters: 25
+  default_model_config: default
+
+# Step-level routing is intentionally explicit so model swaps stay one-line changes.
+step_models:
+  cascade: gpt-5.2-think
+  plan: claude-sonnet-4.6
+  draft: gpt-5.4
+  repetition: gpt-5.4-nano
+  style: gpt-5.4-nano
+  craft: gpt-5.4-nano
+  final: gpt-5.4
+  summary: gpt-5.4-nano
+
+step_overrides:
+  plan:
+    max_tokens: 60000
+    temperature: 0.5
+  draft:
+    max_tokens: 60000
+    temperature: 0.8
+  repetition:
+    max_tokens: 60000
+    temperature: 0.3
+  style:
+    max_tokens: 60000
+    temperature: 0.3
+  craft:
+    max_tokens: 60000
+    temperature: 0.3
+  final:
+    max_tokens: 60000
+    temperature: 0.7
+    reasoning:
+      effort: low
+  summary:
+    max_tokens: 60000
+    temperature: 0.3
+
+cascade:
+  max_retries: 3
+  retry_delay_seconds: 2
+  min_response_length: 50
+  bracket_pattern: '\[[A-Z][^\]\n]{15,}\]'
+
+steps:
+  max_retries: 2
+  retry_delay_seconds: 3
+  warn_context_tokens: 60000
