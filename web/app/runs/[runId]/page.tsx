@@ -3,13 +3,21 @@ import { notFound } from "next/navigation";
 import { loadJob, loadRun } from "../../../lib/api";
 import {
   approveCandidateAction,
+  autoRunCascadeAction,
+  autoRunChapterAction,
+  buildManuscriptAction,
   cancelJobAction,
   createBranchAction,
+  executeStepAction,
   manualContinueAction,
+  runCascadeSectionAction,
   rerunStepAction
 } from "./actions";
+import { JobPanel } from "./job-panel";
 
 const STEP_COLUMNS = ["plan", "draft", "repetition_audit", "style", "craft", "final", "summary"];
+const SECTION_HEADING_PATTERN = /^## (section_(\d+)_([^\n]+))\s*$/gm;
+const BRACKET_PATTERN = /\[[A-Z][^\]\n]{15,}\]/;
 
 type RunDetailPageProps = {
   params: Promise<{ runId: string }>;
@@ -45,6 +53,36 @@ function branchSuggestion(runId: string): string {
   return `${runId}_branch_a`;
 }
 
+function hasUnfilledBrackets(text: string): boolean {
+  return BRACKET_PATTERN.test(text) || /\[[\s\S]{15,}\]/.test(text);
+}
+
+function nextIncompleteSection(worksheet: string): { number: number; key: string } | null {
+  const matches = Array.from(worksheet.matchAll(SECTION_HEADING_PATTERN));
+  if (!matches.length) {
+    return null;
+  }
+
+  for (let index = 0; index < matches.length; index += 1) {
+    const match = matches[index];
+    const sectionNumber = Number(match[2]);
+    if (sectionNumber === 1) {
+      continue;
+    }
+    const start = match.index ?? 0;
+    const end = index + 1 < matches.length ? (matches[index + 1].index ?? worksheet.length) : worksheet.length;
+    const body = worksheet.slice(start, end).trim();
+    if (hasUnfilledBrackets(body)) {
+      return {
+        number: sectionNumber,
+        key: match[1]
+      };
+    }
+  }
+
+  return null;
+}
+
 export default async function RunDetailPage({ params, searchParams }: RunDetailPageProps) {
   const { runId } = await params;
   const query = (await searchParams) ?? {};
@@ -57,15 +95,23 @@ export default async function RunDetailPage({ params, searchParams }: RunDetailP
   const job = query.jobId ? await loadJob(query.jobId) : null;
   const chapters = Object.entries(run.chapters).sort((a, b) => Number(a[0]) - Number(b[0]));
   const currentReview = run.current_review.state;
-  const currentChapter = run.current_review.chapter ?? run.current_chapter;
-  const currentStep = run.current_review.step ?? run.latest_step ?? "draft";
+  const focusChapter = run.current_review.chapter ?? run.current_chapter ?? 1;
+  const focusStep = run.current_review.step ?? run.latest_step ?? "plan";
   const candidateContent =
     run.current_candidate?.content ??
-    (currentChapter ? run.chapters[String(currentChapter)]?.[currentStep ?? ""] : "") ??
+    run.chapters[String(focusChapter)]?.[focusStep] ??
     "No current candidate output is available for this run yet.";
   const flashMessage = query.error ?? query.message;
   const branch = run.studio?.branch;
-  const recentEvents = job?.events?.slice(-5).reverse() ?? [];
+  const pendingReview = Boolean(currentReview?.review_required);
+  const activeJob = job?.status === "queued" || job?.status === "running";
+  const executionBlocked = pendingReview || activeJob;
+  const nextCascade = nextIncompleteSection(run.worksheet);
+  const executionBlockReason = pendingReview
+    ? "Review checkpoint pending. Approve, rerun, or manually continue before resuming execution."
+    : activeJob
+      ? "A job is already running for this run. Wait for it to finish or cancel it first."
+      : null;
 
   return (
     <>
@@ -79,7 +125,7 @@ export default async function RunDetailPage({ params, searchParams }: RunDetailP
           </p>
         </div>
         <div className="action-row">
-          <Link className="button" href={`/templates?runId=${run.run_id}&chapter=${currentChapter ?? 1}&step=${currentStep}`}>
+          <Link className="button" href={`/templates?runId=${run.run_id}&chapter=${focusChapter}&step=${focusStep}`}>
             Open preview
           </Link>
           <Link className="button-secondary" href="/settings">
@@ -139,14 +185,14 @@ export default async function RunDetailPage({ params, searchParams }: RunDetailP
             <div className="section-head">
               <h3>Review rail</h3>
               <span className="pill">
-                {run.studio?.run_settings?.review_policy?.[currentStep ?? ""] ?? "default"}
+                {run.studio?.run_settings?.review_policy?.[focusStep] ?? "default"}
               </span>
             </div>
             <div className="rail-list">
               <div className="list-item">
                 <div className="list-title">Current focus</div>
                 <div className="list-copy mono">
-                  {chapterLabel(currentChapter)} · {currentStep}
+                  {chapterLabel(focusChapter)} · {focusStep}
                 </div>
               </div>
               <div className="list-item">
@@ -186,59 +232,7 @@ export default async function RunDetailPage({ params, searchParams }: RunDetailP
             </div>
           </div>
 
-          {job ? (
-            <div className="content-card">
-              <div className="section-head">
-                <h3>Active job</h3>
-                <span
-                  className="status-chip"
-                  data-tone={job.status === "failed" ? "warning" : job.status === "succeeded" ? "success" : "accent"}
-                >
-                  {job.status}
-                </span>
-              </div>
-              <div className="rail-list">
-                <div className="list-item">
-                  <div className="list-title">Job</div>
-                  <div className="list-copy mono">{job.job_type}</div>
-                </div>
-                <div className="list-item">
-                  <div className="list-title">Target</div>
-                  <div className="list-copy mono">
-                    {String(job.target.chapter ?? job.target.section_number ?? "run")} · {String(job.target.step ?? "job")}
-                  </div>
-                </div>
-                {job.error ? (
-                  <div className="list-item">
-                    <div className="list-title">Error</div>
-                    <div className="list-copy">{job.error}</div>
-                  </div>
-                ) : null}
-                <div className="event-list">
-                  {recentEvents.map((event, index) => (
-                    <div key={`${event.event}-${index}`} className="event-item">
-                      <div className="event-name mono">{event.event}</div>
-                      <div className="list-copy">{event.message}</div>
-                    </div>
-                  ))}
-                </div>
-                <div className="action-row">
-                  <Link className="button-secondary" href={`/runs/${run.run_id}?jobId=${job.job_id}`}>
-                    Refresh status
-                  </Link>
-                  {job.status === "queued" || job.status === "running" ? (
-                    <form action={cancelJobAction}>
-                      <input type="hidden" name="run_id" value={run.run_id} />
-                      <input type="hidden" name="job_id" value={job.job_id} />
-                      <button className="button-secondary" type="submit">
-                        Cancel job
-                      </button>
-                    </form>
-                  ) : null}
-                </div>
-              </div>
-            </div>
-          ) : null}
+          {job ? <JobPanel initialJob={job} runId={run.run_id} cancelAction={cancelJobAction} /> : null}
         </aside>
       </section>
 
@@ -251,8 +245,8 @@ export default async function RunDetailPage({ params, searchParams }: RunDetailP
           <div className="stack">
             <form action={approveCandidateAction} className="action-row">
               <input type="hidden" name="run_id" value={run.run_id} />
-              <input type="hidden" name="chapter" value={currentChapter ?? 1} />
-              <input type="hidden" name="step" value={currentStep} />
+              <input type="hidden" name="chapter" value={focusChapter} />
+              <input type="hidden" name="step" value={focusStep} />
               <input type="hidden" name="candidate_id" value={run.current_candidate?.candidate_id ?? ""} />
               <button className="button" type="submit" disabled={!run.current_candidate}>
                 Approve candidate
@@ -261,8 +255,8 @@ export default async function RunDetailPage({ params, searchParams }: RunDetailP
 
             <form action={rerunStepAction} className="stack">
               <input type="hidden" name="run_id" value={run.run_id} />
-              <input type="hidden" name="chapter" value={currentChapter ?? 1} />
-              <input type="hidden" name="step" value={currentStep} />
+              <input type="hidden" name="chapter" value={focusChapter} />
+              <input type="hidden" name="step" value={focusStep} />
               <label className="field-group">
                 <span className="field-label">Steering note</span>
                 <textarea
@@ -284,7 +278,7 @@ export default async function RunDetailPage({ params, searchParams }: RunDetailP
                 <button className="button-secondary" type="submit">
                   Rerun step
                 </button>
-                <Link className="button-secondary" href={`/templates?runId=${run.run_id}&chapter=${currentChapter ?? 1}&step=${currentStep}`}>
+                <Link className="button-secondary" href={`/templates?runId=${run.run_id}&chapter=${focusChapter}&step=${focusStep}`}>
                   Render prompt
                 </Link>
               </div>
@@ -299,8 +293,8 @@ export default async function RunDetailPage({ params, searchParams }: RunDetailP
           </div>
           <form action={manualContinueAction} className="stack">
             <input type="hidden" name="run_id" value={run.run_id} />
-            <input type="hidden" name="chapter" value={currentChapter ?? 1} />
-            <input type="hidden" name="step" value={currentStep} />
+            <input type="hidden" name="chapter" value={focusChapter} />
+            <input type="hidden" name="step" value={focusStep} />
             <label className="field-group">
               <span className="field-label">Edited output</span>
               <textarea className="editor-input mono" name="content" rows={14} defaultValue={candidateContent} />
@@ -321,12 +315,84 @@ export default async function RunDetailPage({ params, searchParams }: RunDetailP
       <section className="run-grid">
         <article className="content-card">
           <div className="section-head">
+            <h3>Execution controls</h3>
+            <span className="pill">{executionBlocked ? "blocked" : "ready"}</span>
+          </div>
+          <div className="stack">
+            <div className="kv-grid">
+              <div className="kv-row">
+                <span className="kv-label">Current step target</span>
+                <span className="kv-value mono">
+                  {chapterLabel(focusChapter)} · {focusStep}
+                </span>
+              </div>
+              <div className="kv-row">
+                <span className="kv-label">Chapter auto target</span>
+                <span className="kv-value mono">{chapterLabel(focusChapter)}</span>
+              </div>
+              <div className="kv-row">
+                <span className="kv-label">Cascade target</span>
+                <span className="kv-value mono">
+                  {nextCascade ? `${nextCascade.key} (#${nextCascade.number})` : "complete"}
+                </span>
+              </div>
+            </div>
+            {executionBlockReason ? <div className="empty-note">{executionBlockReason}</div> : null}
+            <div className="action-grid">
+              <form action={executeStepAction}>
+                <input type="hidden" name="run_id" value={run.run_id} />
+                <input type="hidden" name="chapter" value={focusChapter} />
+                <input type="hidden" name="step" value={focusStep} />
+                <button className="button-secondary action-block" type="submit" disabled={executionBlocked}>
+                  Run once
+                </button>
+              </form>
+              <form action={autoRunChapterAction}>
+                <input type="hidden" name="run_id" value={run.run_id} />
+                <input type="hidden" name="chapter" value={focusChapter} />
+                <button className="button-secondary action-block" type="submit" disabled={executionBlocked}>
+                  Auto-run chapter
+                </button>
+              </form>
+              <form action={runCascadeSectionAction}>
+                <input type="hidden" name="run_id" value={run.run_id} />
+                <input type="hidden" name="section_number" value={nextCascade?.number ?? ""} />
+                <button
+                  className="button-secondary action-block"
+                  type="submit"
+                  disabled={executionBlocked || !nextCascade}
+                >
+                  Run next cascade section
+                </button>
+              </form>
+              <form action={autoRunCascadeAction}>
+                <input type="hidden" name="run_id" value={run.run_id} />
+                <button
+                  className="button-secondary action-block"
+                  type="submit"
+                  disabled={executionBlocked || !nextCascade}
+                >
+                  Auto-run remaining cascade
+                </button>
+              </form>
+              <form action={buildManuscriptAction}>
+                <input type="hidden" name="run_id" value={run.run_id} />
+                <button className="button-secondary action-block" type="submit" disabled={executionBlocked}>
+                  Build manuscript
+                </button>
+              </form>
+            </div>
+          </div>
+        </article>
+
+        <article className="content-card">
+          <div className="section-head">
             <h3>Branch run</h3>
             <span className="pill">metadata only</span>
           </div>
           <form action={createBranchAction} className="stack">
             <input type="hidden" name="run_id" value={run.run_id} />
-            <input type="hidden" name="branched_from_chapter" value={currentChapter ?? ""} />
+            <input type="hidden" name="branched_from_chapter" value={focusChapter} />
             <label className="field-group">
               <span className="field-label">New run id</span>
               <input className="field-input mono" name="new_run_id" defaultValue={branchSuggestion(run.run_id)} />

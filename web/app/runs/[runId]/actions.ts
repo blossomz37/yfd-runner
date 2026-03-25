@@ -4,9 +4,14 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   approveCandidate,
+  autoRunCascade,
+  autoRunChapter,
+  buildManuscript,
   branchRun,
   cancelJob,
+  executeStep,
   manualContinueStep,
+  runCascadeSection,
   rerunStep
 } from "../../../lib/api";
 
@@ -123,5 +128,104 @@ export async function cancelJobAction(formData: FormData): Promise<void> {
     });
   } catch (error) {
     redirectToRun(runId, { error: error instanceof Error ? error.message : "Unable to cancel job." });
+  }
+}
+
+export async function executeStepAction(formData: FormData): Promise<void> {
+  const runId = String(formData.get("run_id") ?? "").trim();
+  const chapter = Number(formData.get("chapter") ?? 0);
+  const step = String(formData.get("step") ?? "").trim();
+
+  if (!runId || !chapter || !step) {
+    redirectToRun(runId || "partial_ch2_20260319", { error: "Run, chapter, and step are required." });
+  }
+
+  try {
+    const result = await executeStep(runId, chapter, step);
+    revalidatePath(`/runs/${runId}`);
+    redirectToRun(runId, {
+      message: `Step queued for ch${String(chapter).padStart(2, "0")} ${step}.`,
+      jobId: result.job_id
+    });
+  } catch (error) {
+    redirectToRun(runId, { error: error instanceof Error ? error.message : "Unable to queue step." });
+  }
+}
+
+export async function autoRunChapterAction(formData: FormData): Promise<void> {
+  const runId = String(formData.get("run_id") ?? "").trim();
+  const chapter = Number(formData.get("chapter") ?? 0);
+
+  if (!runId || !chapter) {
+    redirectToRun(runId || "partial_ch2_20260319", { error: "Run and chapter are required." });
+  }
+
+  try {
+    const result = await autoRunChapter(runId, chapter);
+    revalidatePath(`/runs/${runId}`);
+    redirectToRun(runId, {
+      message: `Chapter auto-run queued for ch${String(chapter).padStart(2, "0")}.`,
+      jobId: result.job_id
+    });
+  } catch (error) {
+    redirectToRun(runId, { error: error instanceof Error ? error.message : "Unable to auto-run chapter." });
+  }
+}
+
+export async function runCascadeSectionAction(formData: FormData): Promise<void> {
+  const runId = String(formData.get("run_id") ?? "").trim();
+  const sectionNumber = Number(formData.get("section_number") ?? 0);
+
+  if (!runId || !sectionNumber) {
+    redirectToRun(runId || "partial_ch2_20260319", { error: "Run and section are required." });
+  }
+
+  try {
+    const result = await runCascadeSection(runId, sectionNumber);
+    revalidatePath(`/runs/${runId}`);
+    redirectToRun(runId, {
+      message: `Cascade section ${sectionNumber} queued.`,
+      jobId: result.job_id
+    });
+  } catch (error) {
+    redirectToRun(runId, { error: error instanceof Error ? error.message : "Unable to queue cascade section." });
+  }
+}
+
+export async function autoRunCascadeAction(formData: FormData): Promise<void> {
+  const runId = String(formData.get("run_id") ?? "").trim();
+
+  if (!runId) {
+    redirectToRun("partial_ch2_20260319", { error: "Run id is required." });
+  }
+
+  try {
+    const result = await autoRunCascade(runId);
+    revalidatePath(`/runs/${runId}`);
+    redirectToRun(runId, {
+      message: "Remaining cascade queued.",
+      jobId: result.job_id
+    });
+  } catch (error) {
+    redirectToRun(runId, { error: error instanceof Error ? error.message : "Unable to queue cascade auto-run." });
+  }
+}
+
+export async function buildManuscriptAction(formData: FormData): Promise<void> {
+  const runId = String(formData.get("run_id") ?? "").trim();
+
+  if (!runId) {
+    redirectToRun("partial_ch2_20260319", { error: "Run id is required." });
+  }
+
+  try {
+    const result = await buildManuscript(runId);
+    revalidatePath(`/runs/${runId}`);
+    redirectToRun(runId, {
+      message: "Manuscript build queued.",
+      jobId: result.job_id
+    });
+  } catch (error) {
+    redirectToRun(runId, { error: error instanceof Error ? error.message : "Unable to build manuscript." });
   }
 }

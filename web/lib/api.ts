@@ -204,6 +204,8 @@ type ApiRunDetail = {
 type ApiErrorPayload = {
   detail?: string;
   errors?: Array<{ message?: string }>;
+  status?: string;
+  active_job_id?: string;
 };
 
 const fallbackRuns: RunSummary[] = [
@@ -277,6 +279,9 @@ async function apiFetch<T>(path: string): Promise<T | null> {
 function errorMessage(payload: ApiErrorPayload | null, fallback: string): string {
   if (payload?.detail) {
     return payload.detail;
+  }
+  if (payload?.status === "active_job_conflict" && payload.active_job_id) {
+    return `Run already has an active job: ${payload.active_job_id}`;
   }
   if (payload?.errors?.length) {
     return payload.errors
@@ -436,7 +441,21 @@ export async function loadRun(runId: string): Promise<RunDetail | null> {
     state_path: "yfd-runner/state/partial_ch2_20260319.json",
     updated_at: "2026-03-25T08:55:00Z",
     model_config: "default",
-    worksheet: "## section_1_required_data_layer\n\n### required_data_layer\n\nImported dossier and worksheet context.",
+    worksheet: [
+      "## section_1_required_data_layer",
+      "",
+      "### required_data_layer",
+      "",
+      "Imported dossier and worksheet context.",
+      "",
+      "## section_2_story_concept",
+      "",
+      "[Fill in the story concept with enough detail to guide the cascade.]",
+      "",
+      "## section_3_character_arc",
+      "",
+      "[Fill in the protagonist arc and the core relational pressure for the story.]"
+    ].join("\n"),
     chapters: {
       "1": {
         plan: "done",
@@ -775,6 +794,70 @@ export async function manualContinueStep(
         content,
         review_note: reviewNote
       })
+    },
+  );
+}
+
+export async function executeStep(
+  runId: string,
+  chapter: number,
+  step: string,
+): Promise<{ job_id: string; status: string }> {
+  return apiWrite<{ job_id: string; status: string }>(
+    `/api/runs/${encodeURIComponent(runId)}/chapters/${chapter}/steps/${encodeURIComponent(step)}`,
+    {
+      method: "POST",
+      body: JSON.stringify({ force: true })
+    },
+  );
+}
+
+export async function autoRunChapter(
+  runId: string,
+  chapter: number,
+): Promise<{ job_id: string; status: string }> {
+  return apiWrite<{ job_id: string; status: string }>(
+    `/api/runs/${encodeURIComponent(runId)}/chapters/${chapter}/auto`,
+    {
+      method: "POST",
+      body: JSON.stringify({ force: true })
+    },
+  );
+}
+
+export async function runCascadeSection(
+  runId: string,
+  sectionNumber: number,
+): Promise<{ job_id: string; status: string }> {
+  return apiWrite<{ job_id: string; status: string }>(
+    `/api/runs/${encodeURIComponent(runId)}/cascade/${sectionNumber}`,
+    {
+      method: "POST",
+      body: JSON.stringify({ force: true })
+    },
+  );
+}
+
+export async function autoRunCascade(
+  runId: string,
+): Promise<{ job_id: string; status: string }> {
+  return apiWrite<{ job_id: string; status: string }>(
+    `/api/runs/${encodeURIComponent(runId)}/cascade/auto`,
+    {
+      method: "POST",
+      body: JSON.stringify({ force: true })
+    },
+  );
+}
+
+export async function buildManuscript(
+  runId: string,
+): Promise<{ job_id: string; status: string }> {
+  return apiWrite<{ job_id: string; status: string }>(
+    `/api/runs/${encodeURIComponent(runId)}/build-manuscript`,
+    {
+      method: "POST",
+      body: JSON.stringify({})
     },
   );
 }
