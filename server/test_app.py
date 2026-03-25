@@ -272,6 +272,82 @@ def test_branch_run_copies_state_and_sets_lineage(tmp_path: Path, monkeypatch) -
     assert branch["studio"]["branch"]["branched_at"]
 
 
+def test_run_artifacts_list_and_read_content(tmp_path: Path, monkeypatch) -> None:
+    _, _, worksheet_path = _configure_temp_runner(tmp_path, monkeypatch)
+    _create_temp_run("artifact_run", worksheet_path)
+    output_dir = tmp_path / "custom-output"
+    rendered_dir = tmp_path / "rendered" / "artifact_run"
+    rendered_dir.mkdir(parents=True, exist_ok=True)
+
+    def seed_artifact_state(data: dict) -> None:
+        studio = data.setdefault("studio", {})
+        studio["run_settings"] = {
+            "output_dir": str(output_dir),
+            "review_policy": {},
+            "default_steering_note": "",
+            "created_from": "worksheet",
+        }
+
+    runner_bridge.runner_state.update_state("artifact_run", seed_artifact_state)
+
+    manuscript_path = output_dir / "artifact_run_manuscript.md"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    manuscript_path.write_text("# Chapter 1\n\nCanonical manuscript text.\n", encoding="utf-8")
+    (rendered_dir / "ch01_step01_plan.md").write_text("Rendered plan prompt.", encoding="utf-8")
+    (rendered_dir / "ch02_draft_validation_fail.md").write_text("Validation failure text.", encoding="utf-8")
+    (rendered_dir / "cascade_fail_section_02_section_2_story_concept.md").write_text(
+        "Cascade failure content.",
+        encoding="utf-8",
+    )
+
+    response = client.get("/api/runs/artifact_run/artifacts")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["manuscript"]["artifact_type"] == "manuscript"
+    assert payload["manuscript"]["exists"] is True
+    assert {artifact["artifact_type"] for artifact in payload["artifacts"]} == {
+        "rendered_prompt",
+        "validation_failure",
+        "cascade_failure",
+    }
+    assert any(artifact["step"] == "plan" for artifact in payload["artifacts"])
+    assert any(artifact["step"] == "draft" for artifact in payload["artifacts"])
+
+    manuscript_response = client.get("/api/runs/artifact_run/manuscript")
+    assert manuscript_response.status_code == 200
+    assert "Canonical manuscript text." in manuscript_response.json()["content"]
+
+    artifact_response = client.get("/api/runs/artifact_run/artifacts/content", params={"artifact": "ch01_step01_plan.md"})
+    assert artifact_response.status_code == 200
+    assert artifact_response.json()["artifact"]["artifact_type"] == "rendered_prompt"
+    assert artifact_response.json()["content"] == "Rendered plan prompt."
+
+
+def test_run_artifact_content_rejects_path_traversal(tmp_path: Path, monkeypatch) -> None:
+    _, _, worksheet_path = _configure_temp_runner(tmp_path, monkeypatch)
+    _create_temp_run("artifact_guard", worksheet_path)
+
+    response = client.get("/api/runs/artifact_guard/artifacts/content", params={"artifact": "../secrets.md"})
+    assert response.status_code == 400
+    payload = response.json()
+    assert payload["status"] == "validation_error"
+    assert payload["errors"][0]["code"] == "artifact_invalid"
+
+
+def test_run_artifact_endpoints_return_not_found_for_missing_resources(tmp_path: Path, monkeypatch) -> None:
+    _, _, worksheet_path = _configure_temp_runner(tmp_path, monkeypatch)
+    _create_temp_run("artifact_missing", worksheet_path)
+
+    missing_run = client.get("/api/runs/does_not_exist/artifacts")
+    assert missing_run.status_code == 404
+
+    missing_artifact = client.get("/api/runs/artifact_missing/artifacts/content", params={"artifact": "missing.md"})
+    assert missing_artifact.status_code == 404
+
+    missing_manuscript = client.get("/api/runs/artifact_missing/manuscript")
+    assert missing_manuscript.status_code == 404
+
+
 def test_put_worksheet_section_updates_run_state(tmp_path: Path, monkeypatch) -> None:
     _, _, worksheet_path = _configure_temp_runner(tmp_path, monkeypatch)
     _create_temp_run("editable_run", worksheet_path)

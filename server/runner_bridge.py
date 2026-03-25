@@ -7,6 +7,7 @@ import re
 import sys
 import threading
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -109,6 +110,14 @@ def _display_path(path: Path) -> str:
         return str(path.relative_to(ROOT_DIR))
     except ValueError:
         return str(path)
+
+
+def _mtime_iso(path: Path) -> str | None:
+    try:
+        timestamp = path.stat().st_mtime
+    except OSError:
+        return None
+    return datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def _require_absolute_path(path_str: str, label: str) -> Path:
@@ -701,6 +710,139 @@ def _run_output_dir_from_data(data: dict[str, Any]) -> Path | None:
     if not output_dir:
         return None
     return Path(str(output_dir))
+
+
+def _manuscript_path_for_run(run_id: str, data: dict[str, Any]) -> Path:
+    output_root = _run_output_dir_from_data(data) or runner_manuscript.OUTPUT_DIR
+    return output_root / f"{run_id}_manuscript.md"
+
+
+def _rendered_dir_for_run(run_id: str) -> Path:
+    return runner_renderer.RENDERED_DIR / run_id
+
+
+def _manuscript_summary(run_id: str, data: dict[str, Any]) -> dict[str, Any]:
+    path = _manuscript_path_for_run(run_id, data)
+    return {
+        "artifact_id": "manuscript",
+        "artifact_type": "manuscript",
+        "label": "Manuscript",
+        "name": path.name,
+        "path": _display_path(path),
+        "exists": path.exists(),
+        "updated_at": _mtime_iso(path),
+        "chapter": None,
+        "step": None,
+        "section_number": None,
+    }
+
+
+def _rendered_artifact_summary(path: Path) -> dict[str, Any]:
+    name = path.name
+    chapter: int | None = None
+    step: str | None = None
+    section_number: int | None = None
+    artifact_type = "rendered_prompt"
+    label = name
+
+    cascade_match = re.match(r"^cascade_fail_section_(?P<section>\d+)_(?P<section_key>.+)\.md$", name)
+    if cascade_match:
+        section_number = int(cascade_match.group("section"))
+        section_key = cascade_match.group("section_key")
+        artifact_type = "cascade_failure"
+        label = f"Cascade failure · {section_key.replace('_', ' ')}"
+    else:
+        chapter_match = re.match(r"^ch(?P<chapter>\d+)_(?P<stem>.+)\.md$", name)
+        if chapter_match:
+            chapter = int(chapter_match.group("chapter"))
+            stem = chapter_match.group("stem")
+            stem = re.sub(r"^step\d+_", "", stem)
+            stem = re.sub(r"_rerun_validation_fail$", "", stem)
+            stem = re.sub(r"_validation_fail$", "", stem)
+            step = stem
+            if "validation_fail" in name:
+                artifact_type = "validation_failure"
+                label = f"Ch {chapter:02d} · {step.replace('_', ' ')} validation failure"
+            else:
+                artifact_type = "rendered_prompt"
+                label = f"Ch {chapter:02d} · {step.replace('_', ' ')} prompt"
+
+    return {
+        "artifact_id": name,
+        "artifact_type": artifact_type,
+        "label": label,
+        "name": name,
+        "path": _display_path(path),
+        "exists": path.exists(),
+        "updated_at": _mtime_iso(path),
+        "chapter": chapter,
+        "step": step,
+        "section_number": section_number,
+    }
+
+
+def _artifact_file_name(artifact_id: str) -> str:
+    candidate = artifact_id.strip()
+    path = Path(candidate)
+    if not candidate or path.name != candidate or path.suffix != ".md":
+        raise ValidationBridgeError(
+            [{"code": "artifact_invalid", "message": f"Invalid artifact identifier: {artifact_id}"}]
+        )
+    return candidate
+
+
+def list_run_artifacts(run_id: str) -> dict[str, Any]:
+    data = _load_run_data(run_id)
+    rendered_dir = _rendered_dir_for_run(run_id)
+    artifacts: list[dict[str, Any]] = []
+    if rendered_dir.exists():
+        for path in sorted(rendered_dir.glob("*.md")):
+            if path.is_file():
+                artifacts.append(_rendered_artifact_summary(path))
+
+    return {
+        "run_id": run_id,
+        "manuscript": _manuscript_summary(run_id, data),
+        "artifacts": artifacts,
+    }
+
+
+def get_run_manuscript(run_id: str) -> dict[str, Any]:
+    data = _load_run_data(run_id)
+    path = _manuscript_path_for_run(run_id, data)
+    if not path.exists() or not path.is_file():
+        raise BridgeError(f"Manuscript not found for run: {run_id}")
+
+    try:
+        content = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise BridgeError(f"Unable to read manuscript for run {run_id}: {exc}") from exc
+
+    return {
+        "run_id": run_id,
+        "artifact": _manuscript_summary(run_id, data),
+        "content": content,
+    }
+
+
+def get_run_artifact_content(run_id: str, artifact_id: str) -> dict[str, Any]:
+    _load_run_data(run_id)
+    file_name = _artifact_file_name(artifact_id)
+    rendered_dir = _rendered_dir_for_run(run_id)
+    path = rendered_dir / file_name
+    if not path.exists() or not path.is_file():
+        raise BridgeError(f"Artifact not found for run {run_id}: {artifact_id}")
+
+    try:
+        content = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise BridgeError(f"Unable to read artifact for run {run_id}: {exc}") from exc
+
+    return {
+        "run_id": run_id,
+        "artifact": _rendered_artifact_summary(path),
+        "content": content,
+    }
 
 
 def _build_manuscript_for_run(run_id: str) -> Path:

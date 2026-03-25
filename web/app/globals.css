@@ -259,6 +259,20 @@ textarea {
   grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
 }
 
+.outputs-grid,
+.comparison-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.outputs-grid {
+  grid-template-columns: minmax(260px, 0.72fr) minmax(0, 1.28fr);
+}
+
+.comparison-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .run-card {
   display: flex;
   flex-direction: column;
@@ -431,6 +445,13 @@ textarea {
   background: #fcf8f0;
 }
 
+.output-frame {
+  margin-top: 14px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.6;
+}
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -593,6 +614,8 @@ textarea {
   .run-grid,
   .detail-grid,
   .template-grid,
+  .outputs-grid,
+  .comparison-grid,
   .form-grid,
   .action-grid,
   .hero-grid,

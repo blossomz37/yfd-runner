@@ -128,6 +128,12 @@ export default async function RunDetailPage({ params, searchParams }: RunDetailP
           <Link className="button" href={`/templates?runId=${run.run_id}&chapter=${focusChapter}&step=${focusStep}`}>
             Open preview
           </Link>
+          <Link
+            className="button-secondary"
+            href={`/outputs?runId=${run.run_id}&chapter=${focusChapter}&step=${focusStep}${run.current_candidate ? `&candidateId=${run.current_candidate.candidate_id}` : ""}`}
+          >
+            Inspect outputs
+          </Link>
           <Link className="button-secondary" href="/settings">
             Review settings
           </Link>
@@ -415,6 +421,12 @@ export default async function RunDetailPage({ params, searchParams }: RunDetailP
             <span className="pill">safe</span>
           </div>
           <div className="rail-list">
+            <Link
+              className="button-secondary"
+              href={`/outputs?runId=${run.run_id}&chapter=${focusChapter}&step=${focusStep}${run.current_candidate ? `&candidateId=${run.current_candidate.candidate_id}` : ""}`}
+            >
+              Inspect outputs
+            </Link>
             <Link className="button-secondary" href="/templates">
               Tune template
             </Link>

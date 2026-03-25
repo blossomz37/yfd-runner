@@ -123,6 +123,33 @@ export type JobStatus = {
   events: JobEvent[];
 };
 
+export type ArtifactType = "manuscript" | "rendered_prompt" | "validation_failure" | "cascade_failure";
+
+export type RunArtifact = {
+  artifact_id: string;
+  artifact_type: ArtifactType;
+  label: string;
+  name: string;
+  path: string;
+  exists: boolean;
+  updated_at: string | null;
+  chapter: number | null;
+  step: string | null;
+  section_number: number | null;
+};
+
+export type RunArtifactsIndex = {
+  run_id: string;
+  manuscript: RunArtifact;
+  artifacts: RunArtifact[];
+};
+
+export type ArtifactContent = {
+  run_id: string;
+  artifact: RunArtifact;
+  content: string;
+};
+
 export type StepSettingUpdateInput = {
   model_config?: string;
   max_tokens?: number;
@@ -166,6 +193,7 @@ export type StepRerunInput = {
 };
 
 const API_BASE = process.env.YFD_STUDIO_API_BASE || "http://127.0.0.1:8000";
+const API_TIMEOUT_MS = 1200;
 const STEP_ORDER = ["plan", "draft", "repetition_audit", "style", "craft", "final", "summary"];
 
 type ApiRunSummary = {
@@ -207,6 +235,9 @@ type ApiErrorPayload = {
   status?: string;
   active_job_id?: string;
 };
+
+type ApiRunArtifactsIndex = RunArtifactsIndex;
+type ApiArtifactContent = ArtifactContent;
 
 const fallbackRuns: RunSummary[] = [
   {
@@ -262,10 +293,148 @@ const fallbackRuns: RunSummary[] = [
   }
 ];
 
+const fallbackArtifactIndexes: Record<string, RunArtifactsIndex> = {
+  partial_ch2_20260319: {
+    run_id: "partial_ch2_20260319",
+    manuscript: {
+      artifact_id: "manuscript",
+      artifact_type: "manuscript",
+      label: "Manuscript",
+      name: "partial_ch2_20260319_manuscript.md",
+      path: "yfd-runner/output/partial_ch2_20260319_manuscript.md",
+      exists: true,
+      updated_at: "2026-03-25T08:55:00Z",
+      chapter: null,
+      step: null,
+      section_number: null
+    },
+    artifacts: [
+      {
+        artifact_id: "ch01_step01_plan.md",
+        artifact_type: "rendered_prompt",
+        label: "Ch 01 · plan prompt",
+        name: "ch01_step01_plan.md",
+        path: "yfd-runner/rendered/partial_ch2_20260319/ch01_step01_plan.md",
+        exists: true,
+        updated_at: "2026-03-25T08:20:00Z",
+        chapter: 1,
+        step: "plan",
+        section_number: null
+      },
+      {
+        artifact_id: "ch02_draft_validation_fail.md",
+        artifact_type: "validation_failure",
+        label: "Ch 02 · draft validation failure",
+        name: "ch02_draft_validation_fail.md",
+        path: "yfd-runner/rendered/partial_ch2_20260319/ch02_draft_validation_fail.md",
+        exists: true,
+        updated_at: "2026-03-25T08:42:00Z",
+        chapter: 2,
+        step: "draft",
+        section_number: null
+      }
+    ]
+  },
+  phase11_ch1_auto: {
+    run_id: "phase11_ch1_auto",
+    manuscript: {
+      artifact_id: "manuscript",
+      artifact_type: "manuscript",
+      label: "Manuscript",
+      name: "phase11_ch1_auto_manuscript.md",
+      path: "yfd-runner/output/phase11_ch1_auto_manuscript.md",
+      exists: true,
+      updated_at: "2026-03-25T07:40:00Z",
+      chapter: null,
+      step: null,
+      section_number: null
+    },
+    artifacts: [
+      {
+        artifact_id: "ch02_step01_plan.md",
+        artifact_type: "rendered_prompt",
+        label: "Ch 02 · plan prompt",
+        name: "ch02_step01_plan.md",
+        path: "yfd-runner/rendered/phase11_ch1_auto/ch02_step01_plan.md",
+        exists: true,
+        updated_at: "2026-03-25T07:35:00Z",
+        chapter: 2,
+        step: "plan",
+        section_number: null
+      }
+    ]
+  },
+  phase11_offline: {
+    run_id: "phase11_offline",
+    manuscript: {
+      artifact_id: "manuscript",
+      artifact_type: "manuscript",
+      label: "Manuscript",
+      name: "phase11_offline_manuscript.md",
+      path: "yfd-runner/output/phase11_offline_manuscript.md",
+      exists: true,
+      updated_at: "2026-03-24T23:14:00Z",
+      chapter: null,
+      step: null,
+      section_number: null
+    },
+    artifacts: [
+      {
+        artifact_id: "ch02_step01_plan.md",
+        artifact_type: "rendered_prompt",
+        label: "Ch 02 · plan prompt",
+        name: "ch02_step01_plan.md",
+        path: "yfd-runner/rendered/phase11_offline/ch02_step01_plan.md",
+        exists: true,
+        updated_at: "2026-03-24T23:10:00Z",
+        chapter: 2,
+        step: "plan",
+        section_number: null
+      }
+    ]
+  }
+};
+
+const fallbackArtifactContent: Record<string, Record<string, string>> = {
+  partial_ch2_20260319: {
+    manuscript: [
+      "# Chapter 1",
+      "",
+      "Anna learned early that information moved faster when it passed through fear than when it passed through trust.",
+      "",
+      "# Chapter 2",
+      "",
+      "By the time she reached the apartment, the city had already decided what the sirens meant."
+    ].join("\n"),
+    "ch01_step01_plan.md": [
+      "Generate a scene plan for Chapter 1.",
+      "",
+      "Constraints:",
+      "- stay close to the dossier facts",
+      "- foreground relational pressure",
+      "- keep the turn concrete"
+    ].join("\n"),
+    "ch02_draft_validation_fail.md": [
+      "This draft became too abstract and summary-heavy.",
+      "",
+      "It needs more scene-bound prose, sensory anchors, and fewer generalized statements."
+    ].join("\n")
+  },
+  phase11_ch1_auto: {
+    manuscript: "# Chapter 1\n\nAuto-run manuscript output.\n",
+    "ch02_step01_plan.md": "Outline Chapter 2 with a clean escalation from the approved Chapter 1 ending.\n"
+  },
+  phase11_offline: {
+    manuscript: "# Chapter 1\n\nOffline manuscript checkpoint.\n",
+    "ch02_step01_plan.md": "Offline prompt render for the next planning pass.\n"
+  }
+};
+
 async function apiFetch<T>(path: string): Promise<T | null> {
   try {
     const response = await fetch(`${API_BASE}${path}`, {
-      cache: "no-store"
+      cache: "no-store",
+      signal: AbortSignal.timeout(API_TIMEOUT_MS)
     });
     if (!response.ok) {
       return null;
@@ -297,6 +466,7 @@ async function apiWrite<T>(path: string, init: RequestInit): Promise<T> {
   try {
     response = await fetch(`${API_BASE}${path}`, {
       cache: "no-store",
+      signal: AbortSignal.timeout(API_TIMEOUT_MS),
       ...init,
       headers: {
         "content-type": "application/json",
@@ -420,6 +590,61 @@ function normalizeRunDetail(payload: ApiRunDetail): RunDetail {
   };
 }
 
+function genericFallbackRunDetail(runId: string): RunDetail | null {
+  const summary = fallbackRuns.find((entry) => entry.run_id === runId);
+  if (!summary) {
+    return null;
+  }
+  const chapter = summary.current_chapter ?? 1;
+  const latestStep = summary.latest_step ?? "plan";
+  return {
+    run_id: summary.run_id,
+    state_path: `yfd-runner/state/${summary.run_id}.json`,
+    updated_at: summary.updated_at,
+    model_config: "default",
+    worksheet: [
+      "## section_1_required_data_layer",
+      "",
+      "### required_data_layer",
+      "",
+      "Imported worksheet context.",
+      "",
+      "## section_2_story_concept",
+      "",
+      "Story concept checkpoint."
+    ].join("\n"),
+    chapters: {
+      "1": {
+        plan: "done",
+        draft: "done",
+        final: "done",
+        summary: "done"
+      },
+      [String(chapter)]: {
+        [latestStep]: `${latestStep} checkpoint`
+      }
+    },
+    metrics: summary.metrics,
+    current_chapter: chapter,
+    latest_step: latestStep,
+    current_review: {
+      chapter,
+      step: latestStep,
+      state: null
+    },
+    current_candidate: null,
+    studio: {
+      run_settings: {
+        review_policy: {},
+        output_dir: "yfd-runner/output",
+        created_from: "worksheet"
+      },
+      review_state: {},
+      candidate_outputs: []
+    }
+  };
+}
+
 export async function loadRuns(): Promise<RunSummary[]> {
   const payload = await apiFetch<{ runs: ApiRunSummary[] }>("/api/runs");
   if (payload?.runs?.length) {
@@ -433,10 +658,8 @@ export async function loadRun(runId: string): Promise<RunDetail | null> {
   if (payload) {
     return normalizeRunDetail(payload);
   }
-  if (runId !== "partial_ch2_20260319") {
-    return null;
-  }
-  return {
+  if (runId === "partial_ch2_20260319") {
+    return {
     run_id: "partial_ch2_20260319",
     state_path: "yfd-runner/state/partial_ch2_20260319.json",
     updated_at: "2026-03-25T08:55:00Z",
@@ -540,6 +763,8 @@ export async function loadRun(runId: string): Promise<RunDetail | null> {
       ]
     }
   };
+  }
+  return genericFallbackRunDetail(runId);
 }
 
 export async function loadTemplates(): Promise<TemplateFile[]> {
@@ -871,4 +1096,48 @@ export async function cancelJob(jobId: string): Promise<JobStatus> {
     method: "POST",
     body: JSON.stringify({})
   });
+}
+
+export async function loadRunArtifacts(runId: string): Promise<RunArtifactsIndex | null> {
+  const payload = await apiFetch<ApiRunArtifactsIndex>(`/api/runs/${encodeURIComponent(runId)}/artifacts`);
+  if (payload) {
+    return payload;
+  }
+  return fallbackArtifactIndexes[runId] ?? null;
+}
+
+export async function loadRunManuscript(runId: string): Promise<ArtifactContent | null> {
+  const payload = await apiFetch<ApiArtifactContent>(`/api/runs/${encodeURIComponent(runId)}/manuscript`);
+  if (payload) {
+    return payload;
+  }
+  const index = fallbackArtifactIndexes[runId];
+  const content = fallbackArtifactContent[runId]?.manuscript;
+  if (!index || !content) {
+    return null;
+  }
+  return {
+    run_id: runId,
+    artifact: index.manuscript,
+    content
+  };
+}
+
+export async function loadArtifactContent(runId: string, artifactId: string): Promise<ArtifactContent | null> {
+  const query = new URLSearchParams({ artifact: artifactId });
+  const payload = await apiFetch<ApiArtifactContent>(`/api/runs/${encodeURIComponent(runId)}/artifacts/content?${query.toString()}`);
+  if (payload) {
+    return payload;
+  }
+  const index = fallbackArtifactIndexes[runId];
+  const content = fallbackArtifactContent[runId]?.[artifactId];
+  const artifact = index?.artifacts.find((entry) => entry.artifact_id === artifactId);
+  if (!artifact || !content) {
+    return null;
+  }
+  return {
+    run_id: runId,
+    artifact,
+    content
+  };
 }

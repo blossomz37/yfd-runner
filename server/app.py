@@ -105,6 +105,32 @@ def get_run(run_id: str) -> dict[str, object]:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+@app.get("/api/runs/{run_id}/artifacts")
+def get_run_artifacts(run_id: str) -> dict[str, object]:
+    try:
+        return runner_bridge.list_run_artifacts(run_id)
+    except runner_bridge.BridgeError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/api/runs/{run_id}/manuscript")
+def get_run_manuscript(run_id: str) -> dict[str, object]:
+    try:
+        return runner_bridge.get_run_manuscript(run_id)
+    except runner_bridge.BridgeError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/api/runs/{run_id}/artifacts/content")
+def get_run_artifact_content(run_id: str, artifact_id: str = Query(..., alias="artifact")) -> dict[str, object]:
+    try:
+        return runner_bridge.get_run_artifact_content(run_id, artifact_id)
+    except runner_bridge.ValidationBridgeError as exc:
+        return JSONResponse(status_code=400, content={"status": "validation_error", "errors": exc.errors})
+    except runner_bridge.BridgeError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @app.get("/api/templates")
 def get_templates() -> dict[str, object]:
     return {"templates": runner_bridge.list_templates()}
