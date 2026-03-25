@@ -1,5 +1,6 @@
 import { loadModels, loadStepSettings } from "../../lib/api";
 import { saveStepSettingAction } from "./actions";
+import Link from "next/link";
 
 type SettingsPageProps = {
   searchParams?: Promise<{
@@ -26,6 +27,11 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
             Each card submits to <span className="mono">PUT /api/step-settings/{`{step}`}</span>. Extras stay JSON so
             the UI can preserve non-core overrides without inventing a second schema.
           </p>
+        </div>
+        <div className="action-row">
+          <Link className="button-secondary" href="/config">
+            Open raw config
+          </Link>
         </div>
       </section>
 

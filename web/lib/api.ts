@@ -100,6 +100,12 @@ export type StepSetting = {
   extras: Record<string, unknown>;
 };
 
+export type ConfigDetail = {
+  path: string;
+  content: string;
+  data: Record<string, unknown>;
+};
+
 export type JobEvent = {
   timestamp?: string;
   event: string;
@@ -238,6 +244,7 @@ type ApiErrorPayload = {
 
 type ApiRunArtifactsIndex = RunArtifactsIndex;
 type ApiArtifactContent = ArtifactContent;
+type ApiConfigDetail = ConfigDetail;
 
 const fallbackRuns: RunSummary[] = [
   {
@@ -427,6 +434,54 @@ const fallbackArtifactContent: Record<string, Record<string, string>> = {
   phase11_offline: {
     manuscript: "# Chapter 1\n\nOffline manuscript checkpoint.\n",
     "ch02_step01_plan.md": "Offline prompt render for the next planning pass.\n"
+  }
+};
+
+const fallbackConfig: ConfigDetail = {
+  path: "yfd-runner/config.yaml",
+  content: [
+    "openrouter:",
+    "  api_key_env: OPENROUTER_API_KEY",
+    "  base_url: https://openrouter.ai/api/v1/chat/completions",
+    "",
+    "project:",
+    "  name: eaw",
+    "  total_chapters: 25",
+    "  default_model_config: default",
+    "",
+    "step_models:",
+    "  cascade: gpt-5.2-think",
+    "  plan: claude-sonnet-4.6",
+    "  draft: gpt-5.4",
+    "  repetition: gpt-5.4-nano",
+    "  style: gpt-5.4-nano",
+    "  craft: gpt-5.4-nano",
+    "  final: gpt-5.4",
+    "  summary: gpt-5.4-nano",
+    "",
+    "step_overrides:",
+    "  plan:",
+    "    max_tokens: 60000",
+    "    temperature: 0.5",
+    "  draft:",
+    "    max_tokens: 60000",
+    "    temperature: 0.8",
+    "  final:",
+    "    max_tokens: 60000",
+    "    temperature: 0.7",
+    "    reasoning:",
+    "      effort: low"
+  ].join("\n"),
+  data: {
+    openrouter: {
+      api_key_env: "OPENROUTER_API_KEY",
+      base_url: "https://openrouter.ai/api/v1/chat/completions"
+    },
+    project: {
+      name: "eaw",
+      total_chapters: 25,
+      default_model_config: "default"
+    }
   }
 };
 
@@ -781,6 +836,18 @@ export async function loadTemplates(): Promise<TemplateFile[]> {
   ];
 }
 
+export async function loadConfig(): Promise<ConfigDetail> {
+  const payload = await apiFetch<ApiConfigDetail>("/api/config");
+  return payload ?? fallbackConfig;
+}
+
+export async function saveConfig(content: string): Promise<ConfigDetail> {
+  return apiWrite<ConfigDetail>("/api/config", {
+    method: "PUT",
+    body: JSON.stringify({ content })
+  });
+}
+
 export async function loadTemplate(name: string): Promise<TemplateDetail | null> {
   const payload = await apiFetch<TemplateDetail>(`/api/templates/${name}`);
   if (payload) {
@@ -1096,6 +1163,20 @@ export async function cancelJob(jobId: string): Promise<JobStatus> {
     method: "POST",
     body: JSON.stringify({})
   });
+}
+
+export async function saveWorksheetSection(
+  runId: string,
+  sectionKey: string,
+  content: string,
+): Promise<{ run_id: string; section_key: string; status: string }> {
+  return apiWrite<{ run_id: string; section_key: string; status: string }>(
+    `/api/runs/${encodeURIComponent(runId)}/worksheet/${encodeURIComponent(sectionKey)}`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ content })
+    },
+  );
 }
 
 export async function loadRunArtifacts(runId: string): Promise<RunArtifactsIndex | null> {

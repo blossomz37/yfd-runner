@@ -28,7 +28,7 @@ export async function createWorksheetRunAction(formData: FormData): Promise<void
     });
     revalidatePath("/");
     revalidatePath(`/runs/${result.run_id}`);
-    redirect(`/runs/${result.run_id}?created=worksheet`);
+    redirect(`/worksheets?runId=${encodeURIComponent(result.run_id)}&message=${encodeURIComponent("Worksheet run created.")}`);
   } catch (error) {
     redirectIntake("error", error instanceof Error ? error.message : "Unable to create run from worksheet.");
   }
@@ -71,7 +71,7 @@ export async function createDossierProjectAction(formData: FormData): Promise<vo
     });
     revalidatePath("/");
     revalidatePath(`/runs/${result.run_id}`);
-    redirect(`/runs/${result.run_id}?created=dossier`);
+    redirect(`/worksheets?runId=${encodeURIComponent(result.run_id)}&message=${encodeURIComponent("Dossier draft created.")}`);
   } catch (error) {
     redirectIntake("error", error instanceof Error ? error.message : "Unable to create project from dossier.");
   }
