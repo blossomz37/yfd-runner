@@ -59,7 +59,7 @@ def _wait_for_job(job_id: str, timeout_seconds: float = 3.0) -> dict:
         response = client.get(f"/api/jobs/{job_id}")
         assert response.status_code == 200
         payload = response.json()
-        if payload["status"] in {"succeeded", "failed"}:
+        if payload["status"] in {"succeeded", "failed", "cancelled"}:
             return payload
         time.sleep(0.02)
     raise AssertionError(f"Job did not finish in time: {job_id}")
@@ -514,3 +514,64 @@ def test_active_job_conflict_blocks_second_run_scoped_job(tmp_path: Path, monkey
     release.set()
     job = _wait_for_job(first_response.json()["job_id"])
     assert job["status"] == "succeeded"
+
+
+def test_cancel_running_chapter_auto_job_stops_before_next_step(tmp_path: Path, monkeypatch) -> None:
+    _, _, worksheet_path = _configure_temp_runner(tmp_path, monkeypatch)
+    _create_temp_run("cancel_run", worksheet_path)
+
+    def seed_auto_policies(data: dict) -> None:
+        studio = data.setdefault("studio", {})
+        studio["run_settings"] = {
+            "output_dir": None,
+            "review_policy": {
+                "plan": "auto",
+                "draft": "auto",
+                "repetition_audit": "auto",
+                "style": "auto",
+                "craft": "auto",
+                "final": "auto",
+                "summary": "auto",
+            },
+            "default_steering_note": "",
+            "created_from": "worksheet",
+        }
+
+    runner_bridge.runner_state.update_state("cancel_run", seed_auto_policies)
+
+    entered = threading.Event()
+    release = threading.Event()
+    calls: list[str] = []
+
+    def slow_execute_step(run_id: str, chapter: int, step_name: str, model_config=None, force: bool = False) -> str:
+        del model_config, force
+        calls.append(step_name)
+        storage_step = runner_bridge._storage_step_name(step_name)
+        runner_bridge.runner_state.save_step_output(run_id, chapter, storage_step, f"{storage_step} output")
+        if step_name == "plan":
+            entered.set()
+            release.wait(2.0)
+        return f"{storage_step} output"
+
+    monkeypatch.setattr(runner_bridge.runner_cli, "execute_step", slow_execute_step)
+
+    response = client.post("/api/runs/cancel_run/chapters/2/auto", json={})
+    assert response.status_code == 200
+    job_id = response.json()["job_id"]
+    assert entered.wait(1.0)
+
+    cancel_response = client.post(f"/api/jobs/{job_id}/cancel")
+    assert cancel_response.status_code == 200
+    cancel_payload = cancel_response.json()
+    assert cancel_payload["cancel_requested"] is True
+
+    release.set()
+    job = _wait_for_job(job_id)
+    assert job["status"] == "cancelled"
+    assert calls == ["plan"]
+    assert job["error"] == "Job cancelled before starting the next unit of work"
+
+    stream_response = client.get(f"/api/jobs/{job_id}/events")
+    assert stream_response.status_code == 200
+    assert "event: cancel_requested" in stream_response.text
+    assert "event: job_cancelled" in stream_response.text

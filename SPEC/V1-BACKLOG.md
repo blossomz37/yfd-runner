@@ -51,6 +51,7 @@ Purpose: turn the locked v1 slice into an implementation-facing checklist.
 - added SSE-compatible job event streaming over the in-process job log
 - added review-policy pause handling for single-step and chapter auto-run execution
 - added queued cascade execution for single sections and auto-completion
+- added cooperative job cancellation for queued jobs and between-step / between-section loop boundaries
 
 ## In Progress
 
@@ -66,6 +67,7 @@ Purpose: turn the locked v1 slice into an implementation-facing checklist.
 - keep execution mutations behind run-scoped conflict protection
 - avoid overwriting canonical outputs during rerun flows
 - keep step and cascade execution behavior aligned with the existing runner validation rules
+- keep cancellation semantics explicit about cooperative stopping versus mid-call interruption
 
 ## Next
 
@@ -73,7 +75,6 @@ Purpose: turn the locked v1 slice into an implementation-facing checklist.
 
 - stronger rerun review policy handling and warning/failure events
 - richer live events such as attempt counters and rendered-prompt milestones for chapter steps
-- optional cancellation handling for long-running jobs
 
 ### Frontend shell
 

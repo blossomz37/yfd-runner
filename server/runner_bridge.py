@@ -50,6 +50,10 @@ class JobConflictBridgeError(BridgeError):
         super().__init__(f"Run already has an active job: {active_job_id}")
 
 
+class JobCancelledBridgeError(BridgeError):
+    """Raised internally when a queued or running job is cooperatively cancelled."""
+
+
 JOBS_LOCK = threading.Lock()
 JOBS: dict[str, dict[str, Any]] = {}
 ACTIVE_RUN_JOBS: dict[str, str] = {}
@@ -370,6 +374,19 @@ def _append_job_event(job_id: str, event: str, message: str, **fields: Any) -> N
         job.setdefault("events", []).append(_job_event(event, message, **fields))
 
 
+def _cancel_requested(job_id: str) -> bool:
+    with JOBS_LOCK:
+        job = JOBS.get(job_id)
+        if job is None:
+            return False
+        return bool(job.get("cancel_requested"))
+
+
+def _raise_if_cancel_requested(job_id: str, message: str = "Job cancelled before starting the next unit of work") -> None:
+    if _cancel_requested(job_id):
+        raise JobCancelledBridgeError(message)
+
+
 def _finish_job(job_id: str, *, status: str, result: dict[str, Any] | None = None, error: str | None = None) -> None:
     with JOBS_LOCK:
         job = JOBS.get(job_id)
@@ -396,7 +413,12 @@ def _run_job(job_id: str, worker) -> None:
 
     _append_job_event(job_id, "job_started", "Job started")
     try:
+        _raise_if_cancel_requested(job_id, "Job cancelled before execution started")
         result = worker(job_id)
+    except JobCancelledBridgeError as exc:
+        _append_job_event(job_id, "job_cancelled", str(exc))
+        _finish_job(job_id, status="cancelled", error=str(exc))
+        return
     except Exception as exc:  # pragma: no cover - exercised via API tests instead
         if _is_validation_failure_message(str(exc)):
             _append_job_event(job_id, "validation_failed", str(exc))
@@ -435,6 +457,8 @@ def _queue_job(
             "finished_at": None,
             "result": None,
             "error": None,
+            "cancel_requested": False,
+            "cancel_requested_at": None,
             "events": [_job_event("job_queued", "Job queued", **target)],
         }
         JOBS[job_id] = record
@@ -461,9 +485,50 @@ def iter_job_events(job_id: str, poll_interval: float = 0.05):
             yield f"event: {payload.get('event', 'message')}\ndata: {body}\n\n"
             sent += 1
 
-        if snapshot.get("status") in {"succeeded", "failed"}:
+        if snapshot.get("status") in {"succeeded", "failed", "cancelled"}:
             return
         time.sleep(poll_interval)
+
+
+def cancel_job(job_id: str) -> dict[str, Any]:
+    with JOBS_LOCK:
+        job = JOBS.get(job_id)
+        if job is None:
+            raise BridgeError(f"Job not found: {job_id}")
+
+        status = str(job.get("status"))
+        if status in {"succeeded", "failed", "cancelled"}:
+            return copy.deepcopy(job)
+
+        if not job.get("cancel_requested"):
+            job["cancel_requested"] = True
+            job["cancel_requested_at"] = runner_state.now_iso()
+            job.setdefault("events", []).append(
+                _job_event(
+                    "cancel_requested",
+                    "Cancellation requested",
+                    job_id=job_id,
+                    run_id=job.get("run_id"),
+                )
+            )
+
+        if status == "queued":
+            job["status"] = "cancelled"
+            job["finished_at"] = runner_state.now_iso()
+            job["error"] = "Job cancelled before execution started"
+            job.setdefault("events", []).append(
+                _job_event(
+                    "job_cancelled",
+                    "Job cancelled before execution started",
+                    job_id=job_id,
+                    run_id=job.get("run_id"),
+                )
+            )
+            run_id = str(job.get("run_id", ""))
+            if run_id and ACTIVE_RUN_JOBS.get(run_id) == job_id:
+                del ACTIVE_RUN_JOBS[run_id]
+
+        return copy.deepcopy(job)
 
 
 def _validate_step_slot_exists(data: dict[str, Any], chapter: int, step: str) -> None:
@@ -732,6 +797,7 @@ def _execute_step_once(
     job_id: str,
 ) -> dict[str, Any]:
     storage_step = _storage_step_name(step)
+    _raise_if_cancel_requested(job_id)
     _append_job_event(job_id, "step_started", f"Step started: {storage_step}", chapter=chapter, step=storage_step)
     content = runner_cli.execute_step(run_id, chapter, step, model_config=model_config, force=force)
     _append_job_event(job_id, "step_succeeded", f"Step succeeded: {storage_step}", chapter=chapter, step=storage_step)
@@ -777,6 +843,7 @@ def _run_cascade_section_once(
     force: bool,
     job_id: str,
 ) -> dict[str, Any]:
+    _raise_if_cancel_requested(job_id)
     sections = runner_state.parse_sections(runner_state.get_worksheet(run_id))
     target = next((item for item in sections if item["section_number"] == section_number), None)
     if target is None:
@@ -852,6 +919,7 @@ def _run_cascade_section_once(
 
 def queue_build_manuscript(run_id: str) -> dict[str, Any]:
     def worker(job_id: str) -> dict[str, Any]:
+        _raise_if_cancel_requested(job_id)
         _append_job_event(job_id, "step_started", "Build manuscript started")
         output_path = _build_manuscript_for_run(run_id)
         _append_job_event(
@@ -926,6 +994,7 @@ def queue_chapter_auto_run(
         completed_steps: list[str] = []
         paused_at: dict[str, Any] | None = None
         for step_name in runner_cli.step_order_for_chapter(chapter):
+            _raise_if_cancel_requested(job_id)
             step_result = _execute_step_once(
                 run_id,
                 chapter,
@@ -998,6 +1067,7 @@ def queue_cascade_auto(
     def worker(job_id: str) -> dict[str, Any]:
         completed_sections: list[dict[str, Any]] = []
         while True:
+            _raise_if_cancel_requested(job_id)
             next_section = runner_state.get_next_incomplete_section(run_id)
             if next_section is None:
                 break
@@ -1046,6 +1116,7 @@ def queue_rerun_step(
     _validate_step_slot_exists(data, chapter, storage_step)
 
     def worker(job_id: str) -> dict[str, Any]:
+        _raise_if_cancel_requested(job_id)
         _append_job_event(
             job_id,
             "step_started",

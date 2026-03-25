@@ -198,6 +198,14 @@ def get_job_events(job_id: str):
     return StreamingResponse(stream, media_type="text/event-stream")
 
 
+@app.post("/api/jobs/{job_id}/cancel")
+def cancel_job(job_id: str) -> dict[str, object]:
+    try:
+        return runner_bridge.cancel_job(job_id)
+    except runner_bridge.BridgeError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @app.post("/api/runs/{run_id}/build-manuscript")
 def build_manuscript(run_id: str) -> dict[str, object]:
     try:
