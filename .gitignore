@@ -2,7 +2,9 @@
 yfd-novel-pipeline-v1/
 yfd-novel-pipeline-v2/
 distributed/
-.archive/
+.archive/*
+!.archive/SPEC/
+!.archive/SPEC/**
 .vscode/
 .env
 .venv/

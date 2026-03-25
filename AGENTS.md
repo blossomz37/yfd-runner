@@ -5,7 +5,7 @@ This file defines how agents should operate in this repository: how to orient, w
 
 ## Core operating principles
 - Work in small, testable, reviewable units.
-- Treat specs and project documentation as authority.
+- Treat SPEC and project documentation as authority.
 - Keep changes tightly scoped to the requested task.
 - Surface uncertainty early.
 - Prefer clear answers over performative narration.
@@ -33,7 +33,7 @@ Rules:
    - Determine what state the previous session left behind.
 
 2. **Read authority documents**
-   - Read `README.md`, `SPECS/`, backlog notes, and any session or handoff docs.
+   - Read `README.md`, `SPEC/`, backlog notes, and any session or handoff docs.
    - Build against current assumptions, not stale ones.
 
 3. **Validate current state**
@@ -87,7 +87,7 @@ Ask before:
 - introducing a new dependency
 - changing architecture
 - changing public API behavior
-- modifying specs or backlog in a way that changes project direction
+- modifying SPEC or backlog in a way that changes project direction
 - implementing a feature mentioned in docs but not requested in the current task
 
 When checking in, be brief and concrete:
@@ -188,7 +188,7 @@ Update docs when the work changes:
 
 Potential update targets:
 - `README.md`
-- files under `SPECS/`
+- files under `SPEC/`
 - backlog or task docs
 - handoff/session summary docs
 
@@ -206,3 +206,19 @@ When in doubt:
 3. validate current state
 4. ask before making impactful decisions
 5. leave the repo in a clean, understandable state
+
+## Repository hygiene
+Perform this periodically or when explicitly requested:
+
+- Archive clearly stale planning artifacts. Example filepath with mod to `.gitignore`: `!.archive/SPEC/`.
+- Audit and update authoritative docs so they match the shipped app.
+- Separate current truth from historical planning notes.
+- Treat archived or historical planning documents as reference only, not implementation authority.
+- When a historical note conflicts with current authoritative docs or shipped behavior, follow current authority and flag the conflict.
+
+Guidelines:
+- Keep `README.md`, `SPEC/`, and other authority docs aligned with current behavior.
+- Move outdated planning material into an archive location instead of leaving it mixed with active SPEC.
+- Mark historical notes clearly so they do not read as current implementation truth.
+- When docs conflict, update the authoritative source and cross-reference or archive the stale one.
+- Prefer current authoritative docs over historical planning notes when deciding what is in scope.

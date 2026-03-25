@@ -2,124 +2,153 @@
 
 ## Project Overview
 
-YFD Runner is a Python-based Jinja2 prompt sequencer for the YFD (Your First Draft) novel-drafting pipeline. It renders prompt templates, calls the OpenRouter API, and manages persistent state across a multi-step chapter-writing workflow.
+This repository contains two layers of the same local-first system:
 
-The current project ("eaw") targets a 25-chapter novel.
+- `yfd-runner`, the Python execution engine for the YFD novel-drafting pipeline
+- `YFD Studio`, the FastAPI + Next.js control plane built around that runner
+
+The runner remains canonical. The web app edits and orchestrates the same file-backed workflow rather than replacing it with a second storage model.
+
+## Authoritative Docs
+
+The authoritative product docs live under `SPEC/`:
+
+- `SPEC/SPEC.md` for product direction and UX
+- `SPEC/SPEC-requirements.md` for functional requirements and API shape
+- `SPEC/SPEC-implementation.md` for implementation notes, scope, and gaps
+- `SPEC/CURRENT-STATE.md` for shipped surfaces and the next recommended work
+
+Historical planning notes may live under `.archive/`.
 
 ## Repository Layout
 
+```text
+.
+├── server/                    # FastAPI wrapper and service layer
+├── web/                       # Next.js App Router frontend
+├── SPEC/                      # Live product and implementation docs
+├── .archive/                  # Historical notes and retired planning docs
+├── yfd-runner/                # Canonical runner implementation
+│   ├── runner.py
+│   ├── api.py
+│   ├── renderer.py
+│   ├── state.py
+│   ├── validator.py
+│   ├── metrics.py
+│   ├── manuscript.py
+│   ├── config.yaml
+│   ├── models/
+│   ├── templates/
+│   ├── state/
+│   ├── rendered/
+│   ├── output/
+│   ├── stats/
+│   └── test/
+├── worksheet-template.md
+├── user-commands.md
+└── README.md
 ```
-yfd-runner/
-  runner.py          # CLI entry point (argparse)
-  api.py             # OpenRouter API calls + retry logic
-  renderer.py        # Jinja2 template rendering + sliding window assembly
-  state.py           # JSON state load/save, cascade status, worksheet ops
-  validator.py       # Cascade response validation (brackets, headings)
-  metrics.py         # Token/cost/word-count tracking
-  manuscript.py      # Builds combined manuscript from chapter finals
-  config.yaml        # Model assignments, per-step overrides, cascade settings
-  models/            # Named model configs (YAML), one per model
-  templates/         # Jinja2 prompt templates (.j2)
-  state/             # Per-run JSON state files
-  rendered/          # Rendered .md prompts (--render mode)
-  output/            # Generated manuscript files
-  test/              # pytest suite + fixtures
-```
-
-Top-level files: `SPEC.md` is the authoritative project specification. `capability-tests.md` can be ignored.
 
 ## Tech Stack
 
 - Python 3.13+
+- FastAPI for the local backend
+- Next.js App Router for the frontend
 - Jinja2 for template rendering
-- Requests for HTTP (OpenRouter API)
-- PyYAML for config/model files
+- Requests for OpenRouter HTTP calls
+- PyYAML for config and model files
 - python-dotenv for `.env` loading
-- pytest for testing
+- pytest for backend and runner tests
 
-Dependencies are in `yfd-runner/requirements.txt`. Install with:
-```bash
-pip install -r yfd-runner/requirements.txt --break-system-packages
+Dependencies:
+
+- Python: `pip install -r requirements.txt`
+- Frontend: `cd web && npm install`
+
+## Runtime Setup
+
+Required root `.env` value:
+
+```text
+OPENROUTER_API_KEY=<key>
 ```
 
-## Key Concepts
+Start the backend from the repo root:
 
-**Two-phase workflow:**
+```bash
+source .venv/bin/activate
+uvicorn server.app:app --reload --host 127.0.0.1 --port 8000
+```
 
-1. **Cascade** — one-time worksheet setup. Sections 2–17 of a 17-section story worksheet are filled iteratively by AI. Section 1 is author-written. Each section builds on the completed ones before it.
+Start the frontend in another terminal:
 
-2. **Chapter loop** — per-chapter, multi-step pipeline: plan → draft → repetition audit (ch-2+ only) → style edit → craft edit → final → summary. Each step's output feeds into the next.
+```bash
+cd web
+npm run dev -- --hostname 127.0.0.1 --port 3001
+```
 
-**State files** (`state/<run_id>.json`) hold everything: worksheet text, per-chapter step outputs, accumulated chapter summaries, and metrics. All state writes use atomic tmp+rename.
+Frontend default API base:
 
-**Sliding window** for context: `last_chapters_3` / `last_chapters_5` are built dynamically — recent chapters as full text, older ones as summaries. Prevents context overflow on long projects.
+```text
+YFD_STUDIO_API_BASE=http://127.0.0.1:8000
+```
 
-**Model routing** is per-step via `config.yaml` `step_models`. Resolution order: CLI `--model-config` > `step_models[step]` > run-level override > project default > `models/default.yaml`.
+When the backend is unavailable, the frontend can render read-only fallback data for layout and UI checks. Real writes and live execution still require the backend.
 
-## Common CLI Commands
+## Core Concepts
+
+Two major workflows:
+
+1. Cascade: fills worksheet sections 2 through 17 from author-provided source material.
+2. Chapter loop: `plan -> draft -> repetition -> style -> craft -> final -> summary`.
+
+Important data conventions:
+
+- Run state lives in `yfd-runner/state/<run_id>.json`
+- Web-only metadata lives under the top-level `studio` key
+- Canonical approved outputs remain in the runner-compatible chapter fields
+- Reruns and manual edits are preserved under `studio.candidate_outputs`
+- Branch lineage is tracked under `studio.branch`
+
+## Common Commands
+
+Runner commands:
 
 ```bash
 cd yfd-runner
-
-# Initialize a new run from a worksheet
 python runner.py --new --run <run_id> --init --worksheet <path>
-
-# Cascade: fill one section or auto-fill all
 python runner.py --run <id> --cascade --section 2
 python runner.py --run <id> --cascade --auto
-
-# Chapter: single step or full auto
 python runner.py --run <id> --chapter 1 --step plan
 python runner.py --run <id> --chapter 3 --auto
-
-# Render-only (no API call)
-python runner.py --run <id> --chapter 1 --step plan --render
-
-# Stats and manuscript
-python runner.py --run <id> --stats
 python runner.py --run <id> --build-manuscript
-python runner.py --run <id> --cascade-status
+python runner.py --run <id> --stats
 ```
 
-## Running Tests
+Backend tests:
+
+```bash
+.venv/bin/pytest -q server/test_app.py
+```
+
+Runner tests:
 
 ```bash
 cd yfd-runner
 pytest test/ -v
 ```
 
-All tests are offline (no API calls). They use fixtures in `test/fixtures/`.
+Frontend build:
 
-## Environment
-
-The `.env` file lives one directory above `yfd-runner/` (at the project root) and must contain:
-```
-OPENROUTER_API_KEY=<key>
+```bash
+cd web
+npm run build
 ```
 
-Never hardcode the API key. It is loaded via python-dotenv.
+## Key Behavioral Notes
 
-## Step Name Aliases
-
-The `--step` flag and internal code accept these names (aliases resolve automatically):
-
-| Canonical | Aliases |
-|-----------|---------|
-| `plan` | — |
-| `draft` | — |
-| `repetition` | `repetition_audit` |
-| `style` | `edit_style` |
-| `craft` | `edit_craft` |
-| `final` | — |
-| `summary` | — |
-
-## Cascade Validation
-
-Responses are validated for: minimum length (50 chars), correct section heading (`## section_N_key`), and no remaining `[BRACKETED INSTRUCTION TEXT]` (regex: `\[[A-Z][^\]\n]{15,}\]`). Failures retry up to 3 times, then halt. Use `--force` to bypass validation or `--inject <file>` to supply manual content.
-
-## Important Conventions
-
-- Chapter 1 skips the repetition audit step (no prior chapters to compare against).
-- Manuscript is auto-rebuilt after every `summary` step.
-- The `step_overrides` section in `config.yaml` fine-tunes temperature and max_tokens per step without changing model assignment.
-- Section 1 is excluded from cascade status checks since it's author-written and may legitimately contain brackets.
+- Chapter 1 skips the repetition step.
+- Job cancellation is cooperative at loop boundaries, not mid-request interruption.
+- The current job stream is SSE-compatible over in-memory job records.
+- Structured step settings write through `config.step_models` and `config.step_overrides`.
+- Raw `config.yaml` editing exists as an advanced surface in addition to structured settings.
