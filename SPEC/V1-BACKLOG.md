@@ -71,7 +71,14 @@ Purpose: turn the locked v1 slice into an implementation-facing checklist.
 
 ## Next
 
-### Backend orchestration
+### Backend completion
+
+- `POST /api/projects/from-dossier`
+- dossier normalization plus `studio.dossier_blocks` persistence
+- `POST /api/runs/{runId}/branch`
+- structured step settings endpoints over `step_models` and `step_overrides`
+
+### Backend refinement
 
 - stronger rerun review policy handling and warning/failure events
 - richer live events such as attempt counters and rendered-prompt milestones for chapter steps

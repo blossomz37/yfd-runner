@@ -214,6 +214,7 @@ Shows:
 Behavior:
 - copies the source run state into a new branch run
 - preserves lineage metadata for comparison views
+- records branch metadata only; merge and promotion semantics remain explicit follow-up actions
 - allows the user to test new templates, model configs, or steering notes without overwriting the source run
 
 #### 8.2 Run Detail
@@ -249,12 +250,14 @@ Actions:
 Shows:
 - list of YAML model configs in [`yfd-runner/models`](../yfd-runner/models)
 - parsed form plus raw YAML mode
+- structured step settings panel for per-step model assignment and step overrides
 - effective settings after step overrides
 
 Actions:
 - save
 - validate YAML
 - compare model configs
+- edit step model assignment, token ceiling, and temperature without touching raw YAML
 
 #### 8.5 Worksheet Explorer
 
@@ -279,7 +282,7 @@ Shows:
 Actions:
 - upload files
 - paste raw text
-- normalize input
+- normalize input through rule-based cleanup and narrow mapping heuristics
 - accept or edit proposed mappings
 - generate initial worksheet draft
 

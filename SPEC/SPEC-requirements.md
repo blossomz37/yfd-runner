@@ -226,6 +226,12 @@ Loop policy options for v1:
 - stop on API error after retries
 - optionally pause for human approval before advancing to the next step
 
+Cancellation semantics for v1:
+- cancellation is required for active jobs
+- queued jobs must cancel immediately
+- multi-step jobs may stop cooperatively between steps or between cascade sections
+- v1 does not require interrupting an in-flight API call mid-request
+
 ### 9.2.3 Human Review Workflow
 
 The app must support human-in-the-loop checkpoints.
@@ -293,6 +299,7 @@ Requirements:
 - branch creation must copy the current run state
 - branch metadata must record parent run id
 - the UI must make source and branch lineage visible
+- v1 branching is metadata-only; merge and promotion semantics remain explicit user actions
 
 ### 9.2.6 Output Directory Behavior
 
@@ -338,6 +345,20 @@ Then render the exact prompt using the existing renderer logic and display:
 - rendered markdown/text
 - token estimate
 - missing-variable errors if present
+
+### 9.4.1 Structured Step Settings
+
+The app must expose per-step operational settings without requiring raw YAML editing.
+
+V1 minimum:
+- view effective step settings for each pipeline step
+- edit per-step model assignment
+- edit per-step token ceiling and temperature
+- preserve unsupported override keys when writing back to config
+
+The structured step settings surface must map to:
+- `config.step_models`
+- `config.step_overrides`
 
 ### 9.5 Metrics and Diagnostics
 
@@ -385,6 +406,7 @@ This is a preliminary API proposal, not a locked contract.
 - `GET /api/models`
 - `GET /api/models/{name}`
 - `GET /api/config`
+- `GET /api/step-settings`
 - `GET /api/render/step`
 - `GET /api/render/cascade`
 - `GET /api/jobs/{jobId}`
@@ -400,12 +422,14 @@ This is a preliminary API proposal, not a locked contract.
 - `POST /api/runs/{runId}/chapters/{chapter}/steps/{step}`
 - `POST /api/runs/{runId}/chapters/{chapter}/auto`
 - `POST /api/runs/{runId}/build-manuscript`
+- `POST /api/jobs/{jobId}/cancel`
 - `POST /api/runs/{runId}/chapters/{chapter}/steps/{step}/approve`
 - `POST /api/runs/{runId}/chapters/{chapter}/steps/{step}/rerun`
 - `POST /api/runs/{runId}/chapters/{chapter}/steps/{step}/manual-continue`
 - `PUT /api/templates/{name}`
 - `PUT /api/models/{name}`
 - `PUT /api/config`
+- `PUT /api/step-settings/{step}`
 - `PUT /api/runs/{runId}/worksheet/{sectionKey}`
 
 ### Event stream
@@ -531,6 +555,7 @@ Success response:
 V1 note:
 - this endpoint may initially use rule-based normalization plus light backend heuristics
 - it does not need DOCX/PDF parsing in v1
+- this endpoint is part of the locked v1 slice
 
 Error response:
 
@@ -546,6 +571,83 @@ Error response:
 }
 ```
 
+#### `POST /api/runs/{runId}/branch`
+
+Purpose:
+- create a new branch run by copying an existing run state
+
+Request body:
+
+```json
+{
+  "new_run_id": "eaw_001_branch_a",
+  "branched_from_chapter": 3,
+  "branch_note": "Try a darker chapter 4 progression."
+}
+```
+
+Success response:
+
+```json
+{
+  "run_id": "eaw_001_branch_a",
+  "parent_run_id": "eaw_001",
+  "status": "created"
+}
+```
+
+Behavior:
+- copy the source run JSON into a new state file
+- set `studio.branch.parent_run_id`
+- set `studio.branch.branched_from_chapter`
+- set `studio.branch.branch_note`
+- preserve all canonical chapter content from the source run
+
+Validation rules:
+- `new_run_id` must not already exist
+- the source run must exist
+- v1 branch creation is lineage metadata only, not merge logic
+
+#### `GET /api/step-settings`
+
+Purpose:
+- return a structured view of effective per-step model and override settings
+
+Success response:
+
+```json
+{
+  "steps": {
+    "draft": {
+      "model_config": "default",
+      "max_tokens": 60000,
+      "temperature": 0.7,
+      "extras": {}
+    }
+  }
+}
+```
+
+#### `PUT /api/step-settings/{step}`
+
+Purpose:
+- update structured per-step settings and write them back into `config.yaml`
+
+Request body:
+
+```json
+{
+  "model_config": "default",
+  "max_tokens": 60000,
+  "temperature": 0.7
+}
+```
+
+Behavior:
+- update `step_models` and `step_overrides` in config
+- preserve unrelated config keys
+- validate step name and payload types before write
+
 #### `POST /api/runs/{runId}/chapters/{chapter}/steps/{step}/rerun`
 
 Purpose:
@@ -560,6 +662,10 @@ Request body:
   "review_mode": "manual"
 }
 ```
+
+V1 note:
+- web execution may always operate in overwrite-safe force mode
+- overwrite confirmation and validation bypass are separate concerns in the web app
 
 Success response:
 
@@ -665,6 +771,16 @@ Minimum SSE event payload:
   "timestamp": "2026-03-24T18:00:00Z"
 }
 ```
+
+#### `POST /api/jobs/{jobId}/cancel`
+
+Purpose:
+- request cancellation for a queued or running job
+
+V1 behavior:
+- queued jobs cancel immediately
+- running multi-step jobs cancel before the next step or section begins
+- in-flight model calls do not need to be interrupted mid-request
 
 ### 10.2 API Behavior Rules
 

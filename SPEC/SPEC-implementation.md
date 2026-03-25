@@ -40,6 +40,7 @@ The current runner already accepts a worksheet path when initializing a run, but
 - persisted per-run output directory setting
 - service wrappers that pass custom output directories into manuscript and render functions
 - dossier intake and normalization service
+- structured step-settings service over `step_models` and `step_overrides`
 - steering-note injection layer
 - review-state and approval tracking
 - run-branch creation helpers
@@ -53,6 +54,7 @@ This section maps the first implementation pass onto the current Python modules.
 - create a thin service module that wraps runner operations for web use
 - keep HTTP handlers free of business logic
 - centralize path validation, review policy handling, and candidate promotion
+- centralize structured step-settings reads and writes over `config.yaml`
 
 #### `state.py` integration
 
@@ -89,6 +91,7 @@ This section maps the first implementation pass onto the current Python modules.
 
 - enforce one active job per run
 - emit SSE events on queue, start, warning, completion, and failure
+- support cooperative cancellation at loop boundaries
 - persist enough metadata to recover UI state after a backend restart if feasible
 
 ### 11.3 File write safety
@@ -144,7 +147,9 @@ Locked v1 includes:
 - worksheet validation including H1 rejection
 - template editor with prompt preview
 - model editor
+- structured step settings editor
 - run dashboard
+- run branching
 - chapter auto-run and single-step run
 - live job stream
 - output inspector
@@ -167,8 +172,10 @@ Rationale:
 
 - read/write templates
 - read/write model configs
+- read/write structured step settings
 - create run
 - create project from dossier or loose notes
+- branch an existing run
 - run one step
 - run one full chapter
 - run cascade auto
@@ -185,7 +192,6 @@ Rationale:
 - config editor for `config.yaml`
 - manuscript build trigger
 - failure artifact viewer
-- run branching
 - comparison view
 - run search
 
@@ -212,12 +218,15 @@ Rationale:
 - expose step execution endpoints
 - add worksheet validation service
 - add dossier intake service
+- add run branching endpoint
+- add structured step-settings endpoints
 
 ### Phase 2: Core app shell
 
 - add Next.js app
 - implement navigation and run dashboard
 - implement create-project wizard
+- implement step settings panel
 - implement template editor
 - implement model editor
 
@@ -272,15 +281,19 @@ Once approval gates, reruns, and branching exist, the product needs a clear conc
 
 ## 16. Open Questions
 
-- Should the backend wrap `runner.execute_step` directly, or introduce a new service layer around it first?
+Resolved in implementation:
+- The backend uses a service layer around runner modules rather than calling CLI entrypoints directly from HTTP handlers.
+- Review checkpoints are configurable per run through `studio.run_settings.review_policy`, with explicit locked defaults.
+- Rejected and rerun candidate outputs live in the same run file under `studio.candidate_outputs`.
+- V1 cancellation is cooperative at loop boundaries rather than mid-call interruption.
+
+Still open:
 - Should `config.yaml` be edited as raw YAML only, or also through a structured form UI?
 - Do we want template versioning inside the app in v1, or rely on git outside the app?
 - Should rendered prompt previews be read-only, or support ad hoc edits before manual execution?
 - Should the app expose raw state JSON anywhere, or keep all views structured?
 - Do we want a local desktop packaging target later, such as Tauri or Electron, or stay browser-plus-local-server only?
 - What is the minimal internal schema for imported dossier blocks before worksheet generation?
-- Should review checkpoints be configurable per step globally, per run, or both?
-- Do we store rejected and rerun candidate outputs in the same run file or as separate artifacts?
 - What is the promotion model when a branch is preferred over its parent?
 
 Resolved in this draft:
