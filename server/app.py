@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+from pydantic import BaseModel
 from fastapi import FastAPI, HTTPException, Query
 
 from . import runner_bridge
 
 app = FastAPI(title="YFD Studio API", version="0.1.0")
+
+
+class FileUpdateRequest(BaseModel):
+    content: str
 
 
 @app.get("/healthz")
@@ -41,6 +46,35 @@ def get_template(name: str) -> dict[str, str]:
 @app.get("/api/models")
 def get_models() -> dict[str, object]:
     return {"models": runner_bridge.list_models()}
+
+
+@app.get("/api/models/{name}")
+def get_model(name: str) -> dict[str, object]:
+    try:
+        return runner_bridge.get_model(name)
+    except runner_bridge.BridgeError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/api/config")
+def get_config() -> dict[str, object]:
+    return runner_bridge.get_config()
+
+
+@app.put("/api/templates/{name}")
+def put_template(name: str, request: FileUpdateRequest) -> dict[str, object]:
+    try:
+        return runner_bridge.update_template(name, request.content)
+    except runner_bridge.BridgeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.put("/api/models/{name}")
+def put_model(name: str, request: FileUpdateRequest) -> dict[str, object]:
+    try:
+        return runner_bridge.update_model(name, request.content)
+    except runner_bridge.BridgeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.get("/api/render/step")

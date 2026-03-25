@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 ROOT_DIR = Path(__file__).resolve().parent.parent
 RUNNER_DIR = ROOT_DIR / "yfd-runner"
+MODELS_DIR = RUNNER_DIR / "models"
 
 if str(RUNNER_DIR) not in sys.path:
     sys.path.insert(0, str(RUNNER_DIR))
@@ -16,6 +20,20 @@ import state as runner_state
 
 class BridgeError(Exception):
     """Raised when the service layer cannot fulfill a request."""
+
+
+def _validate_relative_name(name: str, suffix: str) -> str:
+    candidate = Path(name)
+    if candidate.name != name or candidate.suffix != suffix:
+        raise BridgeError(f"Invalid file name: {name}")
+    return name
+
+
+def _write_text_atomic(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    tmp_path.write_text(content, encoding="utf-8")
+    os.rename(tmp_path, path)
 
 
 def _sorted_run_paths() -> list[Path]:
@@ -84,7 +102,8 @@ def list_templates() -> list[dict[str, str]]:
 
 
 def get_template(name: str) -> dict[str, str]:
-    path = runner_renderer.TEMPLATES_DIR / name
+    safe_name = _validate_relative_name(name, ".j2")
+    path = runner_renderer.TEMPLATES_DIR / safe_name
     if not path.exists():
         raise BridgeError(f"Template not found: {name}")
     return {
@@ -94,10 +113,29 @@ def get_template(name: str) -> dict[str, str]:
     }
 
 
+def update_template(name: str, content: str) -> dict[str, str]:
+    safe_name = _validate_relative_name(name, ".j2")
+    path = runner_renderer.TEMPLATES_DIR / safe_name
+    if not path.exists():
+        raise BridgeError(f"Template not found: {name}")
+
+    if not content.strip():
+        raise BridgeError("Template content must not be empty")
+
+    # Validate syntax before write while preserving the exact source content.
+    try:
+        runner_renderer.build_environment().parse(content)
+    except Exception as exc:  # pragma: no cover - surfaced through API
+        raise BridgeError(f"Template validation failed: {exc}") from exc
+
+    normalized = content if content.endswith("\n") else content + "\n"
+    _write_text_atomic(path, normalized)
+    return get_template(safe_name)
+
+
 def list_models() -> list[dict[str, str]]:
-    models_dir = RUNNER_DIR / "models"
     models: list[dict[str, str]] = []
-    for path in sorted(models_dir.glob("*.yaml")):
+    for path in sorted(MODELS_DIR.glob("*.yaml")):
         models.append(
             {
                 "name": path.name,
@@ -105,6 +143,64 @@ def list_models() -> list[dict[str, str]]:
             }
         )
     return models
+
+
+def get_model(name: str) -> dict[str, Any]:
+    safe_name = _validate_relative_name(name, ".yaml")
+    path = MODELS_DIR / safe_name
+    if not path.exists():
+        raise BridgeError(f"Model config not found: {name}")
+
+    content = path.read_text(encoding="utf-8")
+    try:
+        data = yaml.safe_load(content) or {}
+    except yaml.YAMLError as exc:  # pragma: no cover - surfaced through API
+        raise BridgeError(f"Model YAML is invalid: {exc}") from exc
+
+    if not isinstance(data, dict):
+        raise BridgeError(f"Model YAML must be a mapping: {name}")
+
+    return {
+        "name": path.name,
+        "path": str(path.relative_to(ROOT_DIR)),
+        "content": content,
+        "data": data,
+    }
+
+
+def update_model(name: str, content: str) -> dict[str, Any]:
+    safe_name = _validate_relative_name(name, ".yaml")
+    path = MODELS_DIR / safe_name
+    if not path.exists():
+        raise BridgeError(f"Model config not found: {name}")
+
+    if not content.strip():
+        raise BridgeError("Model content must not be empty")
+
+    try:
+        data = yaml.safe_load(content)
+    except yaml.YAMLError as exc:  # pragma: no cover - surfaced through API
+        raise BridgeError(f"Model validation failed: {exc}") from exc
+
+    if not isinstance(data, dict):
+        raise BridgeError("Model YAML must parse to a mapping")
+    if not data.get("model"):
+        raise BridgeError("Model YAML must define a non-empty 'model' field")
+
+    normalized = content if content.endswith("\n") else content + "\n"
+    _write_text_atomic(path, normalized)
+    return get_model(safe_name)
+
+
+def get_config() -> dict[str, Any]:
+    path = runner_state.CONFIG_PATH
+    content = path.read_text(encoding="utf-8")
+    data = runner_state.load_config(path)
+    return {
+        "path": str(path.relative_to(ROOT_DIR)),
+        "content": content,
+        "data": data,
+    }
 
 
 def render_step_preview(run_id: str, chapter: int, step: str) -> dict[str, Any]:
