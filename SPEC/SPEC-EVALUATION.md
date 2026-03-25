@@ -1,3 +1,9 @@
+---
+created: 2026-03-25T09:07
+modified: 2026-03-25T09:07
+---
+
+
 # YFD Studio — Spec Evaluation
 
 **Evaluator notes — March 25, 2026**
