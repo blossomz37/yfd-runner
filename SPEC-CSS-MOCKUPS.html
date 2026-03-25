@@ -3,15 +3,20 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>YFD Studio Mockups</title>
+    <title>YFD Studio Mockups — Option C v2</title>
     <style>
       :root {
         color-scheme: light;
-        --page-bg: #efe8dd;
-        --page-ink: #201c19;
-        --page-muted: #70675f;
-        --border: rgba(32, 28, 25, 0.12);
-        --shadow: 0 18px 40px rgba(24, 20, 16, 0.12);
+        --page-bg: #efe9df;
+        --page-ink: #1f221f;
+        --page-muted: #6a6f67;
+        --panel: rgba(255, 255, 255, 0.78);
+        --panel-strong: #ffffff;
+        --shell: #e7ebe4;
+        --sidebar: #dce3da;
+        --rail: #e2e7e0;
+        --line: rgba(33, 39, 34, 0.12);
+        --shadow: 0 18px 40px rgba(29, 30, 24, 0.1);
         --radius-xl: 28px;
         --radius-lg: 20px;
         --radius-md: 14px;
@@ -19,6 +24,13 @@
         --sans: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
         --serif: Georgia, "Times New Roman", serif;
         --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        --forest: #385044;
+        --moss: #5d7763;
+        --gold: #b4934d;
+        --sky: #5f86b2;
+        --success: #2f8b5c;
+        --warning: #a1711d;
+        --danger: #a24e4a;
       }
 
       * {
@@ -28,45 +40,113 @@
       body {
         margin: 0;
         background:
-          radial-gradient(circle at top left, rgba(196, 169, 126, 0.18), transparent 28%),
-          radial-gradient(circle at top right, rgba(85, 108, 150, 0.12), transparent 24%),
-          linear-gradient(180deg, #f7f2ea 0%, var(--page-bg) 100%);
+          radial-gradient(circle at top left, rgba(185, 159, 115, 0.18), transparent 26%),
+          radial-gradient(circle at top right, rgba(95, 134, 178, 0.12), transparent 28%),
+          linear-gradient(180deg, #f6f2eb 0%, var(--page-bg) 100%);
         color: var(--page-ink);
         font-family: var(--sans);
       }
 
       .wrap {
-        width: min(1480px, calc(100vw - 40px));
+        width: min(1500px, calc(100vw - 40px));
         margin: 0 auto;
-        padding: 36px 0 80px;
+        padding: 36px 0 72px;
       }
 
       .hero {
         display: grid;
-        gap: 10px;
+        gap: 12px;
         margin-bottom: 28px;
       }
 
       .eyebrow {
         font-size: 12px;
-        letter-spacing: 0.18em;
         text-transform: uppercase;
+        letter-spacing: 0.18em;
         color: var(--page-muted);
       }
 
       h1 {
         margin: 0;
-        font-size: clamp(34px, 4vw, 56px);
+        font-size: clamp(34px, 4.5vw, 62px);
         line-height: 0.95;
         font-family: var(--serif);
         font-weight: 600;
       }
 
       .intro {
-        max-width: 760px;
+        max-width: 820px;
         color: var(--page-muted);
         font-size: 16px;
+        line-height: 1.65;
+      }
+
+      .decision {
+        display: grid;
+        grid-template-columns: 1.4fr 1fr;
+        gap: 18px;
+        padding: 20px 22px;
+        border-radius: var(--radius-lg);
+        background: rgba(255, 255, 255, 0.72);
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(8px);
+      }
+
+      .decision h2,
+      .section-head h2,
+      .screen-card h3 {
+        margin: 0;
+      }
+
+      .decision h2 {
+        font-size: 24px;
+        font-family: var(--serif);
+        font-weight: 600;
+      }
+
+      .decision-copy {
+        color: var(--page-muted);
+        font-size: 14px;
         line-height: 1.6;
+      }
+
+      .pill-row,
+      .meta-row,
+      .toolbar,
+      .action-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .pill,
+      .chip,
+      .button,
+      .ghost {
+        border-radius: 999px;
+        font-size: 12px;
+        line-height: 1;
+        padding: 9px 12px;
+      }
+
+      .pill {
+        border: 1px solid rgba(56, 80, 68, 0.18);
+        background: rgba(56, 80, 68, 0.08);
+        color: var(--forest);
+      }
+
+      .ghost {
+        border: 1px solid rgba(56, 80, 68, 0.12);
+        background: rgba(56, 80, 68, 0.06);
+        color: #4a6051;
+      }
+
+      .button {
+        background: var(--forest);
+        color: #f5f7f2;
+        border: 1px solid rgba(0, 0, 0, 0.02);
       }
 
       .grid {
@@ -74,102 +154,231 @@
         gap: 28px;
       }
 
-      .concept {
-        border: 1px solid var(--border);
-        border-radius: var(--radius-xl);
-        overflow: hidden;
+      .reference-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .reference-card,
+      .concept,
+      .screen-card {
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--line);
         box-shadow: var(--shadow);
-        background: rgba(255, 255, 255, 0.75);
-        backdrop-filter: blur(8px);
+        overflow: hidden;
+      }
+
+      .reference-card {
+        padding: 18px 18px 16px;
+        background: rgba(255, 255, 255, 0.66);
+        backdrop-filter: blur(7px);
+      }
+
+      .reference-card h3 {
+        margin: 0 0 8px;
+        font-size: 18px;
+      }
+
+      .reference-card p {
+        margin: 0;
+        color: var(--page-muted);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .reference-card .mini-shell {
+        margin-top: 14px;
+        padding: 12px;
+        border-radius: 16px;
+        display: grid;
+        grid-template-columns: 110px minmax(0, 1fr) 120px;
+        gap: 10px;
+        min-height: 108px;
+      }
+
+      .mini-side,
+      .mini-main,
+      .mini-rail {
+        border-radius: 12px;
+      }
+
+      .mini-copy {
+        margin-top: 12px;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+      }
+
+      .reference-a .mini-shell {
+        background: #f6ecdd;
+      }
+
+      .reference-a .mini-side {
+        background: #e6d4bc;
+      }
+
+      .reference-a .mini-main {
+        background: #fbf6ee;
+      }
+
+      .reference-a .mini-rail {
+        background: #efe3d2;
+      }
+
+      .reference-b {
+        background: linear-gradient(180deg, rgba(19, 26, 37, 0.96), rgba(29, 38, 52, 0.94));
+        color: #e9f1fb;
+      }
+
+      .reference-b p,
+      .reference-b .mini-copy {
+        color: rgba(233, 241, 251, 0.72);
+      }
+
+      .reference-b .mini-shell {
+        background: #121a26;
+      }
+
+      .reference-b .mini-side {
+        background: #0d1420;
+      }
+
+      .reference-b .mini-main {
+        background: #132030;
+      }
+
+      .reference-b .mini-rail {
+        background: #0f1824;
+      }
+
+      .section-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: end;
+        gap: 18px;
+      }
+
+      .section-head h2 {
+        font-size: 28px;
+        font-family: var(--serif);
+        font-weight: 600;
+      }
+
+      .section-copy {
+        max-width: 760px;
+        color: var(--page-muted);
+        font-size: 14px;
+        line-height: 1.6;
+      }
+
+      .concept {
+        background: linear-gradient(180deg, #d5dbd4 0%, #f1f0ea 18%, #f8f7f3 100%);
       }
 
       .concept-header {
         display: flex;
         justify-content: space-between;
-        gap: 20px;
         align-items: end;
+        gap: 18px;
         padding: 22px 24px 18px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        background: linear-gradient(135deg, rgba(49, 68, 58, 0.96), rgba(122, 142, 126, 0.92));
+        color: #f1f4ee;
       }
 
       .concept-title {
-        margin: 0;
-        font-size: 26px;
-        line-height: 1;
+        font-size: 28px;
+        font-family: var(--serif);
+        font-weight: 600;
       }
 
       .concept-subtitle {
         margin: 8px 0 0;
         max-width: 760px;
         font-size: 14px;
-        line-height: 1.5;
-        opacity: 0.78;
+        line-height: 1.55;
+        opacity: 0.84;
       }
 
-      .concept-notes {
+      .screens {
+        display: grid;
+        gap: 18px;
+        padding: 22px;
+      }
+
+      .screen-card {
+        background: rgba(255, 255, 255, 0.62);
+      }
+
+      .screen-card-head {
         display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        justify-content: flex-end;
+        justify-content: space-between;
+        align-items: end;
+        gap: 16px;
+        padding: 18px 20px 14px;
+        border-bottom: 1px solid rgba(33, 39, 34, 0.08);
+        background: rgba(255, 255, 255, 0.62);
       }
 
-      .pill {
-        padding: 7px 11px;
-        border-radius: 999px;
-        font-size: 12px;
-        letter-spacing: 0.03em;
-        border: 1px solid currentColor;
-        opacity: 0.82;
+      .screen-card h3 {
+        font-size: 22px;
+        font-family: var(--serif);
+        font-weight: 600;
       }
 
-      .mockup {
-        padding: 24px;
+      .screen-card p {
+        margin: 8px 0 0;
+        color: var(--page-muted);
+        font-size: 13px;
+        line-height: 1.55;
       }
 
-      .screen {
-        min-height: 760px;
+      .screen-shell {
+        margin: 18px;
+        min-height: 680px;
+        display: grid;
+        grid-template-columns: 250px minmax(0, 1fr) 310px;
         border-radius: 24px;
         overflow: hidden;
-        display: grid;
-        grid-template-columns: 260px minmax(0, 1fr) 300px;
-        box-shadow: inset 0 1px rgba(255, 255, 255, 0.2);
+        background: var(--shell);
+        box-shadow: inset 0 1px rgba(255, 255, 255, 0.3);
       }
 
-      .sidebar,
-      .main,
-      .rail {
+      .sidebar {
+        background: var(--sidebar);
+        border-right: 1px solid rgba(48, 67, 57, 0.12);
+      }
+
+      .main {
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.56), rgba(255, 255, 255, 0.84)),
+          #f5f4ef;
         min-width: 0;
+      }
+
+      .rail {
+        background: var(--rail);
+        border-left: 1px solid rgba(48, 67, 57, 0.12);
       }
 
       .topbar {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        gap: 18px;
+        gap: 16px;
         padding: 16px 18px;
       }
 
       .brand {
-        font-size: 15px;
-        font-weight: 700;
-        letter-spacing: 0.04em;
+        font-size: 14px;
         text-transform: uppercase;
+        letter-spacing: 0.1em;
+        font-weight: 700;
       }
 
-      .toolbar {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-        flex-wrap: wrap;
-      }
-
-      .ghost,
-      .solid,
-      .status-chip {
-        border-radius: 999px;
-        font-size: 12px;
-        line-height: 1;
-        padding: 9px 12px;
+      .small {
+        color: var(--page-muted);
+        font-size: 11px;
       }
 
       .layout-stack {
@@ -178,55 +387,79 @@
         padding: 0 18px 18px;
       }
 
-      .panel {
+      .panel,
+      .stat,
+      .docbox,
+      .codebox,
+      .matrix,
+      .listbox,
+      .callout {
         border-radius: 18px;
+        border: 1px solid rgba(48, 67, 57, 0.08);
+        background: var(--panel);
+      }
+
+      .panel,
+      .docbox,
+      .codebox,
+      .callout {
         padding: 16px;
       }
 
-      .panel h3,
-      .panel h4 {
+      .panel h4,
+      .docbox h4,
+      .callout h4 {
         margin: 0 0 10px;
-        font-size: 13px;
+        font-size: 12px;
         text-transform: uppercase;
-        letter-spacing: 0.09em;
+        letter-spacing: 0.1em;
       }
 
       .nav-list,
       .meta-list,
-      .chapter-list {
+      .run-list {
         display: grid;
         gap: 8px;
       }
 
       .nav-item,
       .meta-item,
-      .chapter-item {
+      .run-item {
         padding: 11px 12px;
         border-radius: 12px;
         font-size: 14px;
+        background: rgba(255, 255, 255, 0.34);
+      }
+
+      .active {
+        background: rgba(88, 113, 93, 0.16);
+        color: #2e4336;
       }
 
       .workspace {
+        min-width: 0;
         display: grid;
         grid-template-rows: auto auto minmax(0, 1fr);
-        min-width: 0;
       }
 
       .workspace-head {
-        padding: 20px 22px 8px;
+        padding: 20px 22px 10px;
       }
 
       .workspace-title {
-        margin: 0;
-        font-size: 30px;
+        margin: 10px 0 0;
+        font-size: 31px;
         line-height: 1;
+        font-family: var(--serif);
+        font-weight: 600;
       }
 
       .workspace-copy {
         margin: 10px 0 0;
         font-size: 14px;
-        line-height: 1.5;
-        max-width: 72ch;
+        line-height: 1.6;
+        max-width: 70ch;
+        color: var(--page-muted);
       }
 
       .hero-stats {
@@ -237,7 +470,6 @@
       }
 
       .stat {
-        border-radius: 16px;
         padding: 14px 14px 12px;
       }
 
@@ -245,347 +477,212 @@
         font-size: 11px;
         text-transform: uppercase;
         letter-spacing: 0.1em;
-        opacity: 0.7;
+        color: var(--page-muted);
       }
 
       .stat-value {
         margin-top: 8px;
-        font-size: 24px;
+        font-size: 22px;
         font-weight: 700;
       }
 
-      .work-columns {
-        min-height: 0;
+      .content-grid {
         display: grid;
-        grid-template-columns: 1.35fr 1fr;
+        grid-template-columns: 1.45fr 1fr;
         gap: 16px;
         padding: 0 22px 22px;
-      }
-
-      .editor {
-        display: grid;
-        grid-template-rows: auto minmax(0, 1fr);
         min-height: 0;
-      }
-
-      .panel-head {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 12px;
-      }
-
-      .codebox,
-      .docbox,
-      .timeline,
-      .reviewbox {
-        border-radius: 16px;
-        min-height: 0;
-      }
-
-      .codebox {
-        font-family: var(--mono);
-        font-size: 12px;
-        line-height: 1.65;
-        white-space: pre-wrap;
-        padding: 16px;
       }
 
       .docbox {
-        padding: 16px;
         font-size: 14px;
-        line-height: 1.65;
+        line-height: 1.68;
+      }
+
+      .docbox p {
+        margin: 0 0 12px;
       }
 
       .docbox p:last-child {
         margin-bottom: 0;
       }
 
-      .timeline,
-      .reviewbox {
-        padding: 16px;
+      .review-article {
+        background: rgba(255, 255, 255, 0.92);
       }
 
-      .timeline-item {
-        padding: 12px 0;
-        border-top: 1px solid rgba(255, 255, 255, 0.12);
-        font-size: 13px;
+      .review-article p {
+        font-family: var(--serif);
+        font-size: 18px;
+        line-height: 1.8;
       }
 
-      .timeline-item:first-child {
-        border-top: 0;
-        padding-top: 0;
+      .codebox {
+        font-family: var(--mono);
+        font-size: 12px;
+        line-height: 1.7;
+        white-space: pre-wrap;
       }
 
-      .mini-label {
-        display: block;
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.09em;
-        margin-bottom: 6px;
-        opacity: 0.66;
-      }
-
-      .compare-line {
-        display: grid;
-        gap: 6px;
-        margin-top: 10px;
-      }
-
-      .compare-bar {
-        height: 10px;
-        border-radius: 999px;
-      }
-
-      .swatches {
-        display: grid;
-        grid-template-columns: repeat(5, minmax(0, 1fr));
-        gap: 10px;
-        padding: 0 24px 24px;
-      }
-
-      .swatch {
-        border-radius: 16px;
+      .matrix {
+        margin: 0 22px 18px;
         overflow: hidden;
-        border: 1px solid rgba(255, 255, 255, 0.08);
       }
 
-      .swatch-color {
-        height: 64px;
-      }
-
-      .swatch-label {
-        padding: 10px 12px;
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
         font-size: 12px;
       }
 
-      .option-a {
-        background: linear-gradient(180deg, #60503f 0%, #efe2cf 14%, #f5ecde 100%);
-        color: #2a231d;
+      th,
+      td {
+        border-bottom: 1px solid rgba(33, 39, 34, 0.08);
+        padding: 14px 12px;
+        text-align: center;
       }
 
-      .option-a .concept-header {
-        background: linear-gradient(135deg, rgba(95, 67, 42, 0.94), rgba(191, 160, 118, 0.88));
-        color: #fff7ef;
+      th:first-child,
+      td:first-child {
+        text-align: left;
+        width: 110px;
+        padding-left: 18px;
       }
 
-      .option-a .screen {
-        background: #f8f1e6;
+      th {
+        background: rgba(234, 238, 232, 0.82);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        font-size: 10px;
+        color: var(--page-muted);
       }
 
-      .option-a .sidebar {
-        background: linear-gradient(180deg, #efe1cd, #e8d8c1);
-        border-right: 1px solid rgba(89, 67, 42, 0.14);
+      tr:last-child td {
+        border-bottom: 0;
       }
 
-      .option-a .main {
-        background: #fbf7f0;
+      .dot {
+        display: inline-flex;
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
       }
 
-      .option-a .rail {
-        background: #f2e7d8;
-        border-left: 1px solid rgba(89, 67, 42, 0.14);
+      .dot.done {
+        background: var(--success);
       }
 
-      .option-a .workspace-title,
-      .option-a .concept-title {
-        font-family: var(--serif);
-        font-weight: 600;
+      .dot.live {
+        background: var(--sky);
+        box-shadow: 0 0 0 6px rgba(95, 134, 178, 0.15);
       }
 
-      .option-a .ghost {
-        background: rgba(89, 67, 42, 0.08);
-        color: #5d4a38;
+      .dot.wait {
+        background: #cbd4cb;
       }
 
-      .option-a .solid {
-        background: #8e6842;
-        color: #fff7ef;
+      .dot.fail {
+        background: var(--danger);
       }
 
-      .option-a .status-chip {
-        background: #d9c0a4;
-        color: #5b4128;
+      .listbox {
+        overflow: hidden;
       }
 
-      .option-a .panel,
-      .option-a .stat,
-      .option-a .codebox,
-      .option-a .docbox,
-      .option-a .timeline,
-      .option-a .reviewbox {
-        background: rgba(255, 251, 245, 0.85);
-        border: 1px solid rgba(93, 74, 56, 0.11);
+      .logline,
+      .fileline {
+        display: grid;
+        grid-template-columns: 82px minmax(0, 1fr);
+        gap: 12px;
+        padding: 12px 16px;
+        border-top: 1px solid rgba(33, 39, 34, 0.08);
+        font-size: 12px;
       }
 
-      .option-a .nav-item.active,
-      .option-a .chapter-item.active {
-        background: #e0ccb5;
-        color: #483526;
+      .logline:first-child,
+      .fileline:first-child {
+        border-top: 0;
       }
 
-      .option-a .compare-bar {
-        background: linear-gradient(90deg, #8e6842, #c6a47b);
+      .mono {
+        font-family: var(--mono);
       }
 
-      .option-a .swatch-label {
-        background: #fffaf3;
-      }
-
-      .option-b {
-        background: linear-gradient(180deg, #0f1824 0%, #161f2c 100%);
-        color: #d7e4f5;
-      }
-
-      .option-b .concept-header {
-        background: linear-gradient(135deg, rgba(15, 24, 36, 0.96), rgba(42, 68, 94, 0.94));
-        color: #ebf5ff;
-      }
-
-      .option-b .screen {
-        background: #111925;
-      }
-
-      .option-b .sidebar {
-        background: #0d1420;
-        border-right: 1px solid rgba(165, 193, 223, 0.1);
-      }
-
-      .option-b .main {
-        background: #121b28;
-      }
-
-      .option-b .rail {
-        background: #0f1722;
-        border-left: 1px solid rgba(165, 193, 223, 0.1);
-      }
-
-      .option-b .concept-title,
-      .option-b .workspace-title {
+      .accent {
+        color: var(--forest);
         font-weight: 700;
-        letter-spacing: -0.04em;
       }
 
-      .option-b .ghost {
-        background: rgba(115, 162, 212, 0.12);
-        color: #a9c8eb;
+      .warning {
+        color: var(--warning);
+        font-weight: 700;
       }
 
-      .option-b .solid {
-        background: #59a6ff;
-        color: #0c1621;
+      .danger {
+        color: var(--danger);
+        font-weight: 700;
       }
 
-      .option-b .status-chip {
-        background: rgba(96, 233, 203, 0.16);
-        color: #86f3d8;
+      .success {
+        color: var(--success);
+        font-weight: 700;
       }
 
-      .option-b .panel,
-      .option-b .stat,
-      .option-b .codebox,
-      .option-b .docbox,
-      .option-b .timeline,
-      .option-b .reviewbox {
-        background: rgba(18, 29, 43, 0.92);
-        border: 1px solid rgba(128, 170, 214, 0.12);
+      .action-grid {
+        display: grid;
+        gap: 10px;
       }
 
-      .option-b .nav-item.active,
-      .option-b .chapter-item.active {
-        background: rgba(89, 166, 255, 0.16);
-        color: #dff1ff;
+      .action-pill {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 14px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.52);
+        border: 1px solid rgba(48, 67, 57, 0.08);
+        font-size: 13px;
       }
 
-      .option-b .compare-bar {
-        background: linear-gradient(90deg, #59a6ff, #86f3d8);
+      .action-pill strong {
+        display: block;
+        font-size: 12px;
       }
 
-      .option-b .swatch-label {
-        background: #0d1420;
+      .preview-note {
+        margin-top: 12px;
+        padding: 12px 14px;
+        border-left: 3px solid var(--gold);
+        background: rgba(183, 148, 77, 0.1);
+        border-radius: 12px;
+        color: #5f522a;
+        font-size: 13px;
       }
 
-      .option-c {
-        background: linear-gradient(180deg, #d2d8d3 0%, #f1efe8 16%, #f7f6f2 100%);
-        color: #20251f;
+      .callout {
+        background: rgba(255, 255, 255, 0.9);
       }
 
-      .option-c .concept-header {
-        background: linear-gradient(135deg, rgba(46, 59, 51, 0.96), rgba(121, 142, 126, 0.9));
-        color: #f1f4ee;
+      .callout.danger-block {
+        background: rgba(162, 78, 74, 0.08);
+        border-color: rgba(162, 78, 74, 0.16);
       }
 
-      .option-c .screen {
-        background: #eef1ec;
+      .callout.success-block {
+        background: rgba(47, 139, 92, 0.08);
+        border-color: rgba(47, 139, 92, 0.16);
       }
 
-      .option-c .sidebar {
-        background: #dde4db;
-        border-right: 1px solid rgba(52, 66, 58, 0.12);
+      .footer-note {
+        padding: 0 22px 22px;
+        color: var(--page-muted);
+        font-size: 12px;
       }
 
-      .option-c .main {
-        background:
-          linear-gradient(180deg, rgba(255, 255, 255, 0.56), rgba(255, 255, 255, 0.82)),
-          #f4f3ef;
-      }
-
-      .option-c .rail {
-        background: #e3e7e1;
-        border-left: 1px solid rgba(52, 66, 58, 0.12);
-      }
-
-      .option-c .workspace-title {
-        font-size: 31px;
-        letter-spacing: -0.045em;
-      }
-
-      .option-c .ghost {
-        background: rgba(63, 92, 73, 0.08);
-        color: #445a4b;
-      }
-
-      .option-c .solid {
-        background: #56715d;
-        color: #f6f8f4;
-      }
-
-      .option-c .status-chip {
-        background: rgba(183, 158, 89, 0.2);
-        color: #6c5823;
-      }
-
-      .option-c .panel,
-      .option-c .stat,
-      .option-c .codebox,
-      .option-c .docbox,
-      .option-c .timeline,
-      .option-c .reviewbox {
-        background: rgba(255, 255, 255, 0.74);
-        border: 1px solid rgba(52, 66, 58, 0.1);
-      }
-
-      .option-c .nav-item.active,
-      .option-c .chapter-item.active {
-        background: rgba(88, 113, 93, 0.14);
-        color: #32453a;
-      }
-
-      .option-c .compare-bar {
-        background: linear-gradient(90deg, #56715d, #b79e59);
-      }
-
-      .option-c .swatch-label {
-        background: #fbfcf8;
-      }
-
-      .meta-quiet {
-        opacity: 0.68;
-      }
-
-      @media (max-width: 1180px) {
-        .screen {
+      @media (max-width: 1260px) {
+        .screen-shell {
           grid-template-columns: 220px minmax(0, 1fr);
         }
 
@@ -594,30 +691,26 @@
         }
       }
 
-      @media (max-width: 860px) {
+      @media (max-width: 920px) {
         .wrap {
           width: min(100vw - 20px, 1400px);
           padding-top: 22px;
         }
 
-        .mockup {
-          padding: 14px;
+        .decision,
+        .reference-grid,
+        .content-grid,
+        .hero-stats {
+          grid-template-columns: 1fr;
         }
 
-        .screen {
+        .screen-shell {
           grid-template-columns: 1fr;
           min-height: auto;
         }
 
-        .sidebar,
-        .rail {
+        .sidebar {
           display: none;
-        }
-
-        .hero-stats,
-        .work-columns,
-        .swatches {
-          grid-template-columns: 1fr;
         }
       }
     </style>
@@ -625,430 +718,608 @@
   <body>
     <div class="wrap">
       <section class="hero">
-        <div class="eyebrow">Preliminary Visual Mockups</div>
-        <h1>Three directions for YFD Studio.</h1>
+        <div class="eyebrow">Selected Visual Direction</div>
+        <h1>YFD Studio mockups, revised around Option C.</h1>
         <div class="intro">
-          These are not final screens. They are fast concept mockups to compare tone, layout, and color language.
-          Each one uses the same underlying product structure: left navigation, central workspace, and a right-side inspector.
+          This page is no longer a three-way comparison exercise. It is a focused mockup set for the selected
+          `Hybrid Editorial Console` direction, using repo-grounded runs, template names, and review workflows from
+          the current YFD workspace.
+        </div>
+        <div class="decision">
+          <div>
+            <h2>Chosen baseline: Hybrid Editorial Console</h2>
+            <div class="decision-copy">
+              The shell stays calm and structured. Reading and editing surfaces remain bright, spacious, and
+              manuscript-friendly. Operational context is present, but it does not overpower prompt review,
+              validation, or chapter decision-making.
+            </div>
+          </div>
+          <div class="pill-row">
+            <span class="pill">Option C selected</span>
+            <span class="pill">Warm-neutral shell</span>
+            <span class="pill">Review-first run detail</span>
+            <span class="pill">Repo-grounded naming</span>
+            <span class="pill">Four primary screens</span>
+          </div>
         </div>
       </section>
 
       <div class="grid">
-        <section class="concept option-a">
-          <div class="concept-header">
+        <section>
+          <div class="section-head">
             <div>
-              <h2 class="concept-title">Option A — Editorial Workbench</h2>
-              <p class="concept-subtitle">
-                Warm, literary, and text-first. This version leans into the writing-tool identity and makes prompts,
-                prose, and dossier content feel document-centered rather than dashboard-centered.
+              <h2>Reference directions kept small</h2>
+              <div class="section-copy">
+                Options A and B still matter as tonal guardrails, but they are now reference material rather than
+                competing candidates.
+              </div>
+            </div>
+          </div>
+          <div class="reference-grid">
+            <article class="reference-card reference-a">
+              <h3>Option A — Editorial Workbench</h3>
+              <p>
+                Still useful as a reminder that long-form prompt and prose review should feel document-centered and
+                low-glare, not aggressively mechanical.
               </p>
-            </div>
-            <div class="concept-notes">
-              <span class="pill">Warm neutrals</span>
-              <span class="pill">Serif accent</span>
-              <span class="pill">Soft panels</span>
-            </div>
-          </div>
-          <div class="mockup">
-            <div class="screen">
-              <aside class="sidebar">
-                <div class="topbar">
-                  <div class="brand">YFD Studio</div>
-                </div>
-                <div class="layout-stack">
-                  <div class="panel">
-                    <h3>Workspace</h3>
-                    <div class="nav-list">
-                      <div class="nav-item active">Runs</div>
-                      <div class="nav-item">Intake</div>
-                      <div class="nav-item">Templates</div>
-                      <div class="nav-item">Models</div>
-                      <div class="nav-item">Outputs</div>
-                    </div>
-                  </div>
-                  <div class="panel">
-                    <h3>Current Run</h3>
-                    <div class="chapter-list">
-                      <div class="chapter-item active">Chapter 03 · Draft</div>
-                      <div class="chapter-item">Chapter 04 · Pending</div>
-                      <div class="chapter-item">Chapter 05 · Pending</div>
-                    </div>
-                  </div>
-                </div>
-              </aside>
-              <main class="main workspace">
-                <div class="workspace-head">
-                  <div class="toolbar">
-                    <span class="status-chip">Review Required</span>
-                    <span class="ghost">Run eaw_001</span>
-                    <span class="ghost">Template preview live</span>
-                  </div>
-                  <h3 class="workspace-title">Template Editor</h3>
-                  <p class="workspace-copy meta-quiet">
-                    A gentler, manuscript-adjacent environment. The editor and reading surfaces feel like paper, while
-                    controls recede enough to keep the writing front and center.
-                  </p>
-                </div>
-                <div class="hero-stats">
-                  <div class="stat">
-                    <div class="stat-label">Prompt Tokens</div>
-                    <div class="stat-value">35.5k</div>
-                  </div>
-                  <div class="stat">
-                    <div class="stat-label">Current Step</div>
-                    <div class="stat-value">Draft</div>
-                  </div>
-                  <div class="stat">
-                    <div class="stat-label">Output Words</div>
-                    <div class="stat-value">2,841</div>
-                  </div>
-                  <div class="stat">
-                    <div class="stat-label">State</div>
-                    <div class="stat-value">Paused</div>
-                  </div>
-                </div>
-                <div class="work-columns">
-                  <section class="editor panel">
-                    <div class="panel-head">
-                      <h4>Jinja Template</h4>
-                      <div class="toolbar">
-                        <span class="ghost">Preview</span>
-                        <span class="solid">Save</span>
-                      </div>
-                    </div>
-                    <div class="codebox">{% if first_chapter %}
-[Draft Chapter {{ current_chapter }}]
-
-{{ worksheet }}
-{% else %}
-[Use summaries and prior finals]
-{% endif %}</div>
-                  </section>
-                  <section class="panel">
-                    <div class="panel-head">
-                      <h4>Rendered Prompt</h4>
-                      <span class="ghost">Trimmed worksheet</span>
-                    </div>
-                    <div class="docbox">
-                      <p><strong>Writing Style Rules</strong></p>
-                      <p>Section 8 and section 9 are in scope. Voice stays elegant, emotionally legible, and concrete.</p>
-                      <p>The tone here is calm and literary. This makes long prompt review and prose reading pleasant, but it risks feeling a touch too soft for operational monitoring.</p>
-                    </div>
-                  </section>
-                </div>
-              </main>
-              <aside class="rail">
-                <div class="topbar">
-                  <div class="brand">Inspector</div>
-                  <span class="ghost">Live</span>
-                </div>
-                <div class="layout-stack">
-                  <div class="timeline">
-                    <h4>Loop State</h4>
-                    <div class="timeline-item"><span class="mini-label">Step</span>Draft complete, awaiting approval</div>
-                    <div class="timeline-item"><span class="mini-label">Warning</span>Prompt estimate exceeds soft threshold</div>
-                    <div class="timeline-item"><span class="mini-label">Next</span>Final waits until manual review</div>
-                  </div>
-                  <div class="reviewbox">
-                    <h4>Review Actions</h4>
-                    <div class="toolbar">
-                      <span class="solid">Approve</span>
-                      <span class="ghost">Rerun</span>
-                      <span class="ghost">Edit</span>
-                    </div>
-                    <div class="compare-line">
-                      <span class="mini-label">Mood</span>
-                      <div class="compare-bar"></div>
-                    </div>
-                  </div>
-                </div>
-              </aside>
-            </div>
-          </div>
-          <div class="swatches">
-            <div class="swatch"><div class="swatch-color" style="background:#5c4634"></div><div class="swatch-label">Ink Brown</div></div>
-            <div class="swatch"><div class="swatch-color" style="background:#8e6842"></div><div class="swatch-label">Leather</div></div>
-            <div class="swatch"><div class="swatch-color" style="background:#d9c0a4"></div><div class="swatch-label">Approval Sand</div></div>
-            <div class="swatch"><div class="swatch-color" style="background:#f8f1e6"></div><div class="swatch-label">Paper Surface</div></div>
-            <div class="swatch"><div class="swatch-color" style="background:#efe1cd"></div><div class="swatch-label">Sidebar Parchment</div></div>
+              <div class="mini-shell">
+                <div class="mini-side"></div>
+                <div class="mini-main"></div>
+                <div class="mini-rail"></div>
+              </div>
+              <div class="mini-copy">Use as the warmth limit, not the primary shell.</div>
+            </article>
+            <article class="reference-card reference-b">
+              <h3>Option B — Precision Control Room</h3>
+              <p>
+                Still useful for status discipline and execution clarity, but too much of it turns the product into a
+                generic operations console.
+              </p>
+              <div class="mini-shell">
+                <div class="mini-side"></div>
+                <div class="mini-main"></div>
+                <div class="mini-rail"></div>
+              </div>
+              <div class="mini-copy">Use as the structure limit, not the full identity.</div>
+            </article>
           </div>
         </section>
 
-        <section class="concept option-b">
+        <section class="concept">
           <div class="concept-header">
             <div>
-              <h2 class="concept-title">Option B — Precision Control Room</h2>
-              <p class="concept-subtitle">
-                Cooler, denser, and more operational. This version treats YFD as a sequencer and inspection console,
-                with strong segmentation and very explicit system state.
-              </p>
-            </div>
-            <div class="concept-notes">
-              <span class="pill">Cool neutrals</span>
-              <span class="pill">Sharp segmentation</span>
-              <span class="pill">Ops-forward</span>
-            </div>
-          </div>
-          <div class="mockup">
-            <div class="screen">
-              <aside class="sidebar">
-                <div class="topbar">
-                  <div class="brand">YFD / Control</div>
-                </div>
-                <div class="layout-stack">
-                  <div class="panel">
-                    <h3>System</h3>
-                    <div class="nav-list">
-                      <div class="nav-item active">Runs</div>
-                      <div class="nav-item">Jobs</div>
-                      <div class="nav-item">Templates</div>
-                      <div class="nav-item">Models</div>
-                      <div class="nav-item">Validation</div>
-                    </div>
-                  </div>
-                  <div class="panel">
-                    <h3>Runs</h3>
-                    <div class="chapter-list">
-                      <div class="chapter-item active">eaw_001 / ch03 / final</div>
-                      <div class="chapter-item">eaw_001 / ch04 / plan</div>
-                      <div class="chapter-item">branch_dark / ch03 / draft</div>
-                    </div>
-                  </div>
-                </div>
-              </aside>
-              <main class="main workspace">
-                <div class="workspace-head">
-                  <div class="toolbar">
-                    <span class="status-chip">Job Running</span>
-                    <span class="ghost">2 retries configured</span>
-                    <span class="ghost">SSE connected</span>
-                  </div>
-                  <h3 class="workspace-title">Run Dashboard</h3>
-                  <p class="workspace-copy meta-quiet">
-                    The same content model, but treated as an execution system first. Strong contrast, compact cards,
-                    and obvious status signaling make this better for monitoring and debugging.
-                  </p>
-                </div>
-                <div class="hero-stats">
-                  <div class="stat">
-                    <div class="stat-label">Active Jobs</div>
-                    <div class="stat-value">01</div>
-                  </div>
-                  <div class="stat">
-                    <div class="stat-label">Prompt Tokens</div>
-                    <div class="stat-value">35.5k</div>
-                  </div>
-                  <div class="stat">
-                    <div class="stat-label">Warnings</div>
-                    <div class="stat-value">02</div>
-                  </div>
-                  <div class="stat">
-                    <div class="stat-label">Cost</div>
-                    <div class="stat-value">$0.18</div>
-                  </div>
-                </div>
-                <div class="work-columns">
-                  <section class="panel">
-                    <div class="panel-head">
-                      <h4>Step Timeline</h4>
-                      <span class="ghost">ch03</span>
-                    </div>
-                    <div class="timeline">
-                      <div class="timeline-item"><span class="mini-label">Plan</span>Completed in 1 attempt</div>
-                      <div class="timeline-item"><span class="mini-label">Draft</span>Completed, manual review pending</div>
-                      <div class="timeline-item"><span class="mini-label">Final</span>Queued after approval</div>
-                      <div class="timeline-item"><span class="mini-label">Stream</span>warning: prompt exceeds soft threshold</div>
-                    </div>
-                  </section>
-                  <section class="panel">
-                    <div class="panel-head">
-                      <h4>Candidate Compare</h4>
-                      <span class="ghost">draft / 2 candidates</span>
-                    </div>
-                    <div class="docbox">
-                      <p><strong>Candidate A</strong> keeps the original pacing.</p>
-                      <p><strong>Candidate B</strong> applies a steering note to reduce exposition and tighten scene geometry.</p>
-                      <div class="compare-line">
-                        <span class="mini-label">Preference signal</span>
-                        <div class="compare-bar"></div>
-                      </div>
-                    </div>
-                  </section>
-                </div>
-              </main>
-              <aside class="rail">
-                <div class="topbar">
-                  <div class="brand">Inspector</div>
-                  <span class="ghost">Ops</span>
-                </div>
-                <div class="layout-stack">
-                  <div class="panel">
-                    <h4>Validation</h4>
-                    <div class="meta-list">
-                      <div class="meta-item">No H1 headings detected</div>
-                      <div class="meta-item">Sections 8 and 9 trimmed for style step</div>
-                      <div class="meta-item">Retry budget remaining: 1</div>
-                    </div>
-                  </div>
-                  <div class="reviewbox">
-                    <h4>Actions</h4>
-                    <div class="toolbar">
-                      <span class="solid">Approve</span>
-                      <span class="ghost">Pause</span>
-                      <span class="ghost">Cancel</span>
-                    </div>
-                  </div>
-                </div>
-              </aside>
-            </div>
-          </div>
-          <div class="swatches">
-            <div class="swatch"><div class="swatch-color" style="background:#0d1420"></div><div class="swatch-label">Base Shell</div></div>
-            <div class="swatch"><div class="swatch-color" style="background:#121b28"></div><div class="swatch-label">Main Surface</div></div>
-            <div class="swatch"><div class="swatch-color" style="background:#59a6ff"></div><div class="swatch-label">Primary Blue</div></div>
-            <div class="swatch"><div class="swatch-color" style="background:#86f3d8"></div><div class="swatch-label">Running Mint</div></div>
-            <div class="swatch"><div class="swatch-color" style="background:#dff1ff"></div><div class="swatch-label">High Contrast Ink</div></div>
-          </div>
-        </section>
-
-        <section class="concept option-c">
-          <div class="concept-header">
-            <div>
+              <div class="eyebrow" style="color: rgba(241, 244, 238, 0.76);">Primary Direction</div>
               <h2 class="concept-title">Option C — Hybrid Editorial Console</h2>
               <p class="concept-subtitle">
-                A middle path: calm content surfaces, but with more operational structure than the editorial version.
-                This is the most likely fit if YFD needs to feel both author-facing and execution-aware.
+                Four focused screens define the product direction: a runs dashboard, a review-first chapter detail,
+                a template editor with live preview, and a validation recovery screen. Each one is tied to the files
+                and workflows already present in this repo.
               </p>
             </div>
-            <div class="concept-notes">
-              <span class="pill">Balanced structure</span>
-              <span class="pill">Warm-neutral base</span>
-              <span class="pill">Best default</span>
+            <div class="pill-row">
+              <span class="pill" style="background: rgba(255,255,255,0.12); color: #f1f4ee; border-color: rgba(255,255,255,0.18);">Chosen baseline</span>
+              <span class="pill" style="background: rgba(255,255,255,0.12); color: #f1f4ee; border-color: rgba(255,255,255,0.18);">Review rail</span>
+              <span class="pill" style="background: rgba(255,255,255,0.12); color: #f1f4ee; border-color: rgba(255,255,255,0.18);">Template preview</span>
             </div>
           </div>
-          <div class="mockup">
-            <div class="screen">
-              <aside class="sidebar">
-                <div class="topbar">
-                  <div class="brand">YFD Studio</div>
-                </div>
-                <div class="layout-stack">
-                  <div class="panel">
-                    <h3>Navigation</h3>
-                    <div class="nav-list">
-                      <div class="nav-item active">Templates</div>
-                      <div class="nav-item">Runs</div>
-                      <div class="nav-item">Intake</div>
-                      <div class="nav-item">Models</div>
-                      <div class="nav-item">Outputs</div>
-                    </div>
-                  </div>
-                  <div class="panel">
-                    <h3>Current View</h3>
-                    <div class="chapter-list">
-                      <div class="chapter-item active">04-edit-style.j2</div>
-                      <div class="chapter-item">02-draft.j2</div>
-                      <div class="chapter-item">06-final.j2</div>
-                    </div>
-                  </div>
-                </div>
-              </aside>
-              <main class="main workspace">
-                <div class="workspace-head">
-                  <div class="toolbar">
-                    <span class="status-chip">Prompt Preview Ready</span>
-                    <span class="ghost">Run partial_ch2_20260319</span>
-                    <span class="ghost">Step style</span>
-                  </div>
-                  <h3 class="workspace-title">Template + Output Review</h3>
-                  <p class="workspace-copy meta-quiet">
-                    This direction lets the app feel composed and productized while still keeping prompts, dossier text,
-                    and prose outputs comfortable to read for long periods.
+
+          <div class="screens">
+            <article class="screen-card">
+              <div class="screen-card-head">
+                <div>
+                  <h3>Screen A — Runs Dashboard</h3>
+                  <p>
+                    A repo-grounded overview of active runs. This surface should let the user understand what exists,
+                    what is blocked, and where to resume without turning the page into a metrics wall.
                   </p>
                 </div>
-                <div class="hero-stats">
-                  <div class="stat">
-                    <div class="stat-label">Template</div>
-                    <div class="stat-value">04</div>
-                  </div>
-                  <div class="stat">
-                    <div class="stat-label">Rendered Scope</div>
-                    <div class="stat-value">S8+S9</div>
-                  </div>
-                  <div class="stat">
-                    <div class="stat-label">Review Policy</div>
-                    <div class="stat-value">Manual</div>
-                  </div>
-                  <div class="stat">
-                    <div class="stat-label">Branch</div>
-                    <div class="stat-value">Base</div>
-                  </div>
+                <div class="meta-row">
+                  <span class="ghost">Runs</span>
+                  <span class="ghost">Command palette</span>
+                  <span class="button">Initialize run</span>
                 </div>
-                <div class="work-columns">
-                  <section class="editor panel">
-                    <div class="panel-head">
-                      <h4>Prompt Source</h4>
-                      <div class="toolbar">
-                        <span class="ghost">Diff</span>
-                        <span class="solid">Preview</span>
+              </div>
+              <div class="screen-shell">
+                <aside class="sidebar">
+                  <div class="topbar">
+                    <div class="brand">YFD Studio</div>
+                    <span class="ghost">⌘K</span>
+                  </div>
+                  <div class="layout-stack">
+                    <div class="panel">
+                      <h4>Navigation</h4>
+                      <div class="nav-list">
+                        <div class="nav-item active">Runs</div>
+                        <div class="nav-item">Templates</div>
+                        <div class="nav-item">Models</div>
+                        <div class="nav-item">Outputs</div>
                       </div>
                     </div>
+                    <div class="panel">
+                      <h4>Quick Resume</h4>
+                      <div class="run-list">
+                        <div class="run-item active">partial_ch2_20260319 · ch03 draft</div>
+                        <div class="run-item">phase11_ch1_auto · ch02 summary</div>
+                        <div class="run-item">phase11_offline · ch02 plan</div>
+                      </div>
+                    </div>
+                  </div>
+                </aside>
+                <main class="main workspace">
+                  <div class="workspace-head">
+                    <div class="toolbar">
+                      <span class="ghost">Local-first workspace</span>
+                      <span class="ghost">State files visible</span>
+                      <span class="ghost">Command search ready</span>
+                    </div>
+                    <h3 class="workspace-title">Active runs and recent paths</h3>
+                    <p class="workspace-copy">
+                      The overview is not a KPI dashboard. It is an entry point into active state files, chapter
+                      position, review status, and the next meaningful action.
+                    </p>
+                  </div>
+                  <div class="hero-stats">
+                    <div class="stat">
+                      <div class="stat-label">Tracked runs</div>
+                      <div class="stat-value">07</div>
+                    </div>
+                    <div class="stat">
+                      <div class="stat-label">Needs review</div>
+                      <div class="stat-value">02</div>
+                    </div>
+                    <div class="stat">
+                      <div class="stat-label">Current focus</div>
+                      <div class="stat-value">ch03</div>
+                    </div>
+                    <div class="stat">
+                      <div class="stat-label">Last action</div>
+                      <div class="stat-value">Resume</div>
+                    </div>
+                  </div>
+                  <div class="content-grid">
+                    <div class="listbox">
+                      <div class="fileline">
+                        <div class="mono">running</div>
+                        <div>
+                          <strong>partial_ch2_20260319</strong>
+                          <div class="small">Chapter 03 · draft · review gate pending</div>
+                        </div>
+                      </div>
+                      <div class="fileline">
+                        <div class="mono">paused</div>
+                        <div>
+                          <strong>phase11_ch1_auto</strong>
+                          <div class="small">Chapter 02 · summary · manuscript rebuild available</div>
+                        </div>
+                      </div>
+                      <div class="fileline">
+                        <div class="mono">rendered</div>
+                        <div>
+                          <strong>phase11_offline</strong>
+                          <div class="small">Plan prompt written to `yfd-runner/rendered/phase11_offline/`</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="docbox">
+                      <h4>Command palette preview</h4>
+                      <p><span class="accent">Open run</span> `partial_ch2_20260319`</p>
+                      <p><span class="accent">Render prompt</span> `04-edit-style.j2` against current run</p>
+                      <p><span class="accent">Build manuscript</span> from latest `summary` outputs</p>
+                      <div class="preview-note">
+                        The command palette belongs here because this tool bridges file-backed workflows and a faster UI,
+                        not because every screen needs productivity theater.
+                      </div>
+                    </div>
+                  </div>
+                </main>
+                <aside class="rail">
+                  <div class="topbar">
+                    <div class="brand">Run context</div>
+                    <span class="ghost">Current</span>
+                  </div>
+                  <div class="layout-stack">
+                    <div class="panel">
+                      <h4>Selected state file</h4>
+                      <div class="meta-list">
+                        <div class="meta-item mono">yfd-runner/state/partial_ch2_20260319.json</div>
+                        <div class="meta-item">Latest completed step: style</div>
+                        <div class="meta-item">Next likely action: review draft or rerun</div>
+                      </div>
+                    </div>
+                    <div class="panel">
+                      <h4>Quick actions</h4>
+                      <div class="action-grid">
+                        <div class="action-pill"><span><strong>Resume sequence</strong>continue the chapter loop</span><span class="success">ready</span></div>
+                        <div class="action-pill"><span><strong>Open rendered prompt</strong>inspect prompt source and context</span><span class="accent">view</span></div>
+                        <div class="action-pill"><span><strong>Branch run</strong>test new steering or template changes</span><span class="warning">manual</span></div>
+                      </div>
+                    </div>
+                  </div>
+                </aside>
+              </div>
+            </article>
+
+            <article class="screen-card">
+              <div class="screen-card-head">
+                <div>
+                  <h3>Screen B — Run Detail / Chapter Review</h3>
+                  <p>
+                    Review comes first. The execution matrix provides orientation, but the central reading surface is
+                    where the actual output, validation state, and decision controls live.
+                  </p>
+                </div>
+                <div class="meta-row">
+                  <span class="ghost">Run detail</span>
+                  <span class="ghost">Execution matrix</span>
+                  <span class="button">Approve candidate</span>
+                </div>
+              </div>
+              <div class="screen-shell">
+                <aside class="sidebar">
+                  <div class="topbar">
+                    <div class="brand">Runs</div>
+                    <span class="ghost">ch03</span>
+                  </div>
+                  <div class="layout-stack">
+                    <div class="panel">
+                      <h4>Current run</h4>
+                      <div class="run-list">
+                        <div class="run-item active">partial_ch2_20260319</div>
+                        <div class="run-item">Chapter 03</div>
+                        <div class="run-item">Candidate B</div>
+                      </div>
+                    </div>
+                    <div class="panel">
+                      <h4>Review actions</h4>
+                      <div class="action-grid">
+                        <div class="action-pill"><span><strong>Approve</strong>accept current candidate</span><span class="success">go</span></div>
+                        <div class="action-pill"><span><strong>Rerun</strong>try a revised draft step</span><span class="warning">review</span></div>
+                        <div class="action-pill"><span><strong>Branch run</strong>preserve this version first</span><span class="accent">safe</span></div>
+                      </div>
+                    </div>
+                  </div>
+                </aside>
+                <main class="main workspace">
+                  <div class="workspace-head">
+                    <div class="toolbar">
+                      <span class="ghost">Run partial_ch2_20260319</span>
+                      <span class="ghost">Step draft</span>
+                      <span class="ghost">Review required</span>
+                    </div>
+                    <h3 class="workspace-title">Chapter 03 review and next-step decision</h3>
+                    <p class="workspace-copy">
+                      The matrix explains where the run is. The center surface explains whether the output deserves to
+                      advance. Logs and metrics support that decision, but they do not dominate the page.
+                    </p>
+                  </div>
+                  <div class="matrix">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Chapter</th>
+                          <th>Plan</th>
+                          <th>Draft</th>
+                          <th>Repetition</th>
+                          <th>Style</th>
+                          <th>Craft</th>
+                          <th>Final</th>
+                          <th>Summary</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td class="mono">#01</td>
+                          <td><span class="dot done"></span></td>
+                          <td><span class="dot done"></span></td>
+                          <td><span class="dot wait"></span></td>
+                          <td><span class="dot done"></span></td>
+                          <td><span class="dot done"></span></td>
+                          <td><span class="dot done"></span></td>
+                          <td><span class="dot done"></span></td>
+                        </tr>
+                        <tr>
+                          <td class="mono">#02</td>
+                          <td><span class="dot done"></span></td>
+                          <td><span class="dot done"></span></td>
+                          <td><span class="dot done"></span></td>
+                          <td><span class="dot done"></span></td>
+                          <td><span class="dot done"></span></td>
+                          <td><span class="dot done"></span></td>
+                          <td><span class="dot done"></span></td>
+                        </tr>
+                        <tr>
+                          <td class="mono">#03</td>
+                          <td><span class="dot done"></span></td>
+                          <td><span class="dot live"></span></td>
+                          <td><span class="dot wait"></span></td>
+                          <td><span class="dot wait"></span></td>
+                          <td><span class="dot wait"></span></td>
+                          <td><span class="dot wait"></span></td>
+                          <td><span class="dot wait"></span></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div class="content-grid">
+                    <div class="docbox review-article">
+                      <h4>Candidate output</h4>
+                      <p>
+                        Anna did not answer immediately. The silence settled between them in a way that felt less like
+                        hesitation than calibration, as if the sentence she was willing to release had to clear some
+                        private threshold first.
+                      </p>
+                      <p>
+                        He had expected distance or polish. Instead he got precision. Not warmth exactly. Something
+                        harder to dismiss: the kind of attention that made a room reorganize itself around what had not
+                        yet been said.
+                      </p>
+                      <div class="preview-note">
+                        Validation passed structure checks, but the review note flags the second paragraph as slightly
+                        over-compressed for the current chapter cadence.
+                      </div>
+                    </div>
+                    <div class="listbox">
+                      <div class="fileline">
+                        <div class="mono">19:24</div>
+                        <div><span class="success">VALIDATION</span> draft output accepted by heading and bracket rules</div>
+                      </div>
+                      <div class="fileline">
+                        <div class="mono">19:25</div>
+                        <div><span class="warning">REVIEW</span> candidate marked for manual approval before repetition step</div>
+                      </div>
+                      <div class="fileline">
+                        <div class="mono">19:26</div>
+                        <div><span class="accent">PROMPT</span> rendered source available in `yfd-runner/rendered/partial_ch2_20260319/`</div>
+                      </div>
+                    </div>
+                  </div>
+                </main>
+                <aside class="rail">
+                  <div class="topbar">
+                    <div class="brand">Review rail</div>
+                    <span class="ghost">Manual</span>
+                  </div>
+                  <div class="layout-stack">
+                    <div class="panel">
+                      <h4>Current context</h4>
+                      <div class="meta-list">
+                        <div class="meta-item">Template: `02-draft.j2`</div>
+                        <div class="meta-item">Model: `claude-sonnet-4.6.yaml`</div>
+                        <div class="meta-item">Next step blocked until approval</div>
+                      </div>
+                    </div>
+                    <div class="panel">
+                      <h4>Decision set</h4>
+                      <div class="action-grid">
+                        <div class="action-pill"><span><strong>Approve candidate</strong>move on to repetition or style</span><span class="success">next</span></div>
+                        <div class="action-pill"><span><strong>Add steering note</strong>rerun with tighter scene geometry</span><span class="warning">edit</span></div>
+                        <div class="action-pill"><span><strong>Open rendered prompt</strong>inspect the exact prompt payload</span><span class="accent">open</span></div>
+                      </div>
+                    </div>
+                  </div>
+                </aside>
+              </div>
+            </article>
+
+            <article class="screen-card">
+              <div class="screen-card-head">
+                <div>
+                  <h3>Screen C — Template Editor + Preview</h3>
+                  <p>
+                    The template editor should feel deliberate, not generic. Code stays crisp and low-noise. The live
+                    preview reads like a document surface, with repo-grounded template and run context always visible.
+                  </p>
+                </div>
+                <div class="meta-row">
+                  <span class="ghost">04-edit-style.j2</span>
+                  <span class="ghost">Diff</span>
+                  <span class="button">Save template</span>
+                </div>
+              </div>
+              <div class="screen-shell">
+                <aside class="sidebar">
+                  <div class="topbar">
+                    <div class="brand">Templates</div>
+                    <span class="ghost">Preview live</span>
+                  </div>
+                  <div class="layout-stack">
+                    <div class="panel">
+                      <h4>Files</h4>
+                      <div class="run-list">
+                        <div class="run-item">01-plan.j2</div>
+                        <div class="run-item">02-draft.j2</div>
+                        <div class="run-item active">04-edit-style.j2</div>
+                        <div class="run-item">05-edit-craft.j2</div>
+                        <div class="run-item">06-final.j2</div>
+                      </div>
+                    </div>
+                    <div class="panel">
+                      <h4>Bound context</h4>
+                      <div class="meta-list">
+                        <div class="meta-item">Run: `partial_ch2_20260319`</div>
+                        <div class="meta-item">Step: `style`</div>
+                        <div class="meta-item">Rendered scope: sections 8 and 9</div>
+                      </div>
+                    </div>
+                  </div>
+                </aside>
+                <main class="main workspace">
+                  <div class="workspace-head">
+                    <div class="toolbar">
+                      <span class="ghost">Template source</span>
+                      <span class="ghost">Rendered preview</span>
+                      <span class="ghost">Last saved 4 min ago</span>
+                    </div>
+                    <h3 class="workspace-title">Edit source without losing the reading surface</h3>
+                    <p class="workspace-copy">
+                      The key interaction here is immediate translation from template code to a readable rendered
+                      document. This is where the editorial half of Option C should feel strongest.
+                    </p>
+                  </div>
+                  <div class="content-grid">
                     <div class="codebox">Refer to section_8_writing_style_rules
 and section_9_genre_lens in the worksheet:
 
 {{ worksheet }}
 
-Only flag actual rule violations.</div>
-                  </section>
-                  <section class="panel">
-                    <div class="panel-head">
-                      <h4>Output Inspector</h4>
-                      <span class="ghost">Candidate B</span>
+Only flag actual rule violations.
+Keep the edits precise.
+Preserve the existing sentence engine unless clarity demands intervention.</div>
+                    <div class="docbox review-article">
+                      <h4>Rendered preview</h4>
+                      <p>
+                        The current chapter draft stays within the declared genre lens, but two sentences harden into
+                        abstraction where the style pass should keep the prose tactile and scene-bound.
+                      </p>
+                      <p>
+                        Recommended intervention: reduce the abstract compression in paragraph two and preserve the
+                        existing emotional temperature rather than polishing it flatter.
+                      </p>
+                      <div class="preview-note">
+                        Preview generated for `partial_ch2_20260319` using `04-edit-style.j2` and the currently loaded
+                        worksheet state.
+                      </div>
+                    </div>
+                  </div>
+                </main>
+                <aside class="rail">
+                  <div class="topbar">
+                    <div class="brand">Template rail</div>
+                    <span class="ghost">Active</span>
+                  </div>
+                  <div class="layout-stack">
+                    <div class="panel">
+                      <h4>Save actions</h4>
+                      <div class="action-grid">
+                        <div class="action-pill"><span><strong>Save template</strong>persist source changes</span><span class="success">safe</span></div>
+                        <div class="action-pill"><span><strong>Open diff</strong>compare against previous version</span><span class="accent">view</span></div>
+                        <div class="action-pill"><span><strong>Render prompt</strong>refresh live preview</span><span class="warning">run</span></div>
+                      </div>
+                    </div>
+                    <div class="panel">
+                      <h4>Related paths</h4>
+                      <div class="meta-list">
+                        <div class="meta-item mono">yfd-runner/templates/04-edit-style.j2</div>
+                        <div class="meta-item mono">yfd-runner/rendered/partial_ch2_20260319/</div>
+                        <div class="meta-item mono">yfd-runner/state/partial_ch2_20260319.json</div>
+                      </div>
+                    </div>
+                  </div>
+                </aside>
+              </div>
+            </article>
+
+            <article class="screen-card">
+              <div class="screen-card-head">
+                <div>
+                  <h3>Screen D — Validation Failure / Recovery</h3>
+                  <p>
+                    Failure handling is one of the product-defining moments. The screen should explain what failed,
+                    show the offending output, and make recovery actions explicit without dumping the user into raw logs.
+                  </p>
+                </div>
+                <div class="meta-row">
+                  <span class="ghost">Validation failure</span>
+                  <span class="ghost">Inject path available</span>
+                  <span class="button">Rerun draft</span>
+                </div>
+              </div>
+              <div class="screen-shell">
+                <aside class="sidebar">
+                  <div class="topbar">
+                    <div class="brand">Outputs</div>
+                    <span class="ghost">Recovery</span>
+                  </div>
+                  <div class="layout-stack">
+                    <div class="panel">
+                      <h4>Failure source</h4>
+                      <div class="run-list">
+                        <div class="run-item active">partial_ch2_20260319_rerun</div>
+                        <div class="run-item">Section 02 cascade fail</div>
+                        <div class="run-item">Draft validation fail</div>
+                      </div>
+                    </div>
+                    <div class="panel">
+                      <h4>Recovery actions</h4>
+                      <div class="action-grid">
+                        <div class="action-pill"><span><strong>Rerun</strong>retry with current inputs</span><span class="warning">1 left</span></div>
+                        <div class="action-pill"><span><strong>Force</strong>bypass validation</span><span class="danger">risk</span></div>
+                        <div class="action-pill"><span><strong>Inject manual content</strong>replace failed output directly</span><span class="accent">manual</span></div>
+                      </div>
+                    </div>
+                  </div>
+                </aside>
+                <main class="main workspace">
+                  <div class="workspace-head">
+                    <div class="toolbar">
+                      <span class="ghost">Validation failed</span>
+                      <span class="ghost">Remaining retries: 1</span>
+                      <span class="ghost">Manual intervention allowed</span>
+                    </div>
+                    <h3 class="workspace-title">Failure needs explanation before action</h3>
+                    <p class="workspace-copy">
+                      The page should make the error legible at a glance: what rule failed, what snippet triggered it,
+                      and which recovery path is appropriate.
+                    </p>
+                  </div>
+                  <div class="content-grid">
+                    <div>
+                      <div class="callout danger-block">
+                        <h4>Failure reason</h4>
+                        <div class="danger">Bracketed instruction text remained in the output.</div>
+                        <div class="small" style="margin-top: 8px;">
+                          Rule: no unresolved bracketed instruction text after generation.
+                        </div>
+                      </div>
+                      <div class="docbox" style="margin-top: 16px;">
+                        <h4>Offending snippet</h4>
+                        <p class="mono">[EXPAND THE SECTION 2 STORY CONCEPT INTO A MORE SPECIFIC TURNING POINT]</p>
+                        <p class="small">
+                          Found in `yfd-runner/rendered/partial_ch2_20260319/ch02_draft_validation_fail.md`
+                        </p>
+                      </div>
                     </div>
                     <div class="docbox">
-                      <p><strong>Summary:</strong> strong balance between polished reading surfaces and clear pipeline controls.</p>
-                      <p><strong>Tradeoff:</strong> less atmospheric than Option A, less immediately operational than Option B, but probably the safest product foundation.</p>
-                      <p><strong>Use it if:</strong> the app needs to serve both writing and sequencing equally well.</p>
-                    </div>
-                  </section>
-                </div>
-              </main>
-              <aside class="rail">
-                <div class="topbar">
-                  <div class="brand">Review Rail</div>
-                  <span class="ghost">Balanced</span>
-                </div>
-                <div class="layout-stack">
-                  <div class="panel">
-                    <h4>Live Notes</h4>
-                    <div class="meta-list">
-                      <div class="meta-item">Worksheet import valid</div>
-                      <div class="meta-item">Candidate output awaiting approval</div>
-                      <div class="meta-item">Output dir: custom path set</div>
+                      <h4>Recovery guidance</h4>
+                      <p><span class="success">Rerun</span> if the prompt is correct and this looks like a transient model miss.</p>
+                      <p><span class="warning">Inject manual content</span> if the replacement text is obvious and you want to preserve momentum.</p>
+                      <p><span class="danger">Force</span> only if downstream review will definitely catch the remaining defect.</p>
+                      <div class="preview-note">
+                        The rendered prompt should be one click away here so the user can verify whether the failure
+                        came from the template, the model response, or an input state problem.
+                      </div>
                     </div>
                   </div>
-                  <div class="reviewbox">
-                    <h4>Review Actions</h4>
-                    <div class="toolbar">
-                      <span class="solid">Approve</span>
-                      <span class="ghost">Rerun Note</span>
-                      <span class="ghost">Branch</span>
+                </main>
+                <aside class="rail">
+                  <div class="topbar">
+                    <div class="brand">Recovery rail</div>
+                    <span class="ghost">Inspect</span>
+                  </div>
+                  <div class="layout-stack">
+                    <div class="panel">
+                      <h4>Related files</h4>
+                      <div class="meta-list">
+                        <div class="meta-item mono">yfd-runner/rendered/partial_ch2_20260319/ch02_draft_validation_fail.md</div>
+                        <div class="meta-item mono">yfd-runner/state/partial_ch2_20260319_rerun.json</div>
+                        <div class="meta-item mono">yfd-runner/templates/02-draft.j2</div>
+                      </div>
                     </div>
-                    <div class="compare-line">
-                      <span class="mini-label">Visual balance</span>
-                      <div class="compare-bar"></div>
+                    <div class="panel">
+                      <h4>Suggested next move</h4>
+                      <div class="action-grid">
+                        <div class="action-pill"><span><strong>Open rendered prompt</strong>confirm prompt correctness first</span><span class="accent">inspect</span></div>
+                        <div class="action-pill"><span><strong>Add steering note</strong>tighten output expectation before rerun</span><span class="warning">optional</span></div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </aside>
-            </div>
-          </div>
-          <div class="swatches">
-            <div class="swatch"><div class="swatch-color" style="background:#2e3b33"></div><div class="swatch-label">Forest Ink</div></div>
-            <div class="swatch"><div class="swatch-color" style="background:#56715d"></div><div class="swatch-label">Primary Green</div></div>
-            <div class="swatch"><div class="swatch-color" style="background:#b79e59"></div><div class="swatch-label">Review Gold</div></div>
-            <div class="swatch"><div class="swatch-color" style="background:#eef1ec"></div><div class="swatch-label">Shell Mist</div></div>
-            <div class="swatch"><div class="swatch-color" style="background:#ffffff"></div><div class="swatch-label">Reading Surface</div></div>
+                </aside>
+              </div>
+              <div class="footer-note">
+                This screen is intentionally more explanatory than dramatic. Recovery UI should reduce ambiguity, not
+                amplify stress.
+              </div>
+            </article>
           </div>
         </section>
       </div>
