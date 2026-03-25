@@ -100,6 +100,29 @@ export type StepSetting = {
   extras: Record<string, unknown>;
 };
 
+export type JobEvent = {
+  timestamp?: string;
+  event: string;
+  message: string;
+  [key: string]: unknown;
+};
+
+export type JobStatus = {
+  job_id: string;
+  job_type: string;
+  status: string;
+  run_id: string;
+  target: Record<string, unknown>;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  result: Record<string, unknown> | null;
+  error: string | null;
+  cancel_requested: boolean;
+  cancel_requested_at: string | null;
+  events: JobEvent[];
+};
+
 export type StepSettingUpdateInput = {
   model_config?: string;
   max_tokens?: number;
@@ -127,6 +150,19 @@ export type CreateProjectFromDossierInput = {
   blocks: DossierBlockInput[];
   model_config?: string;
   output_dir?: string;
+};
+
+export type BranchRunInput = {
+  new_run_id: string;
+  branched_from_chapter?: number;
+  branch_note?: string;
+};
+
+export type StepRerunInput = {
+  steering_note?: string;
+  review_mode?: string;
+  force?: boolean;
+  model_config?: string;
 };
 
 const API_BASE = process.env.YFD_STUDIO_API_BASE || "http://127.0.0.1:8000";
@@ -678,5 +714,78 @@ export async function createProjectFromDossier(
   return apiWrite<{ run_id: string; status: string; state_path: string }>("/api/projects/from-dossier", {
     method: "POST",
     body: JSON.stringify(input)
+  });
+}
+
+export async function branchRun(
+  runId: string,
+  input: BranchRunInput,
+): Promise<{ run_id: string; parent_run_id: string; status: string; state_path: string }> {
+  return apiWrite<{ run_id: string; parent_run_id: string; status: string; state_path: string }>(
+    `/api/runs/${encodeURIComponent(runId)}/branch`,
+    {
+      method: "POST",
+      body: JSON.stringify(input)
+    },
+  );
+}
+
+export async function rerunStep(
+  runId: string,
+  chapter: number,
+  step: string,
+  input: StepRerunInput,
+): Promise<{ job_id: string; status: string }> {
+  return apiWrite<{ job_id: string; status: string }>(
+    `/api/runs/${encodeURIComponent(runId)}/chapters/${chapter}/steps/${encodeURIComponent(step)}/rerun`,
+    {
+      method: "POST",
+      body: JSON.stringify(input)
+    },
+  );
+}
+
+export async function approveCandidate(
+  runId: string,
+  chapter: number,
+  step: string,
+  candidateId: string,
+): Promise<{ run_id: string; chapter: number; step: string; approved_candidate_id: string; status: string }> {
+  return apiWrite<{ run_id: string; chapter: number; step: string; approved_candidate_id: string; status: string }>(
+    `/api/runs/${encodeURIComponent(runId)}/chapters/${chapter}/steps/${encodeURIComponent(step)}/approve`,
+    {
+      method: "POST",
+      body: JSON.stringify({ candidate_id: candidateId })
+    },
+  );
+}
+
+export async function manualContinueStep(
+  runId: string,
+  chapter: number,
+  step: string,
+  content: string,
+  reviewNote: string,
+): Promise<{ run_id: string; chapter: number; step: string; candidate_id: string; status: string }> {
+  return apiWrite<{ run_id: string; chapter: number; step: string; candidate_id: string; status: string }>(
+    `/api/runs/${encodeURIComponent(runId)}/chapters/${chapter}/steps/${encodeURIComponent(step)}/manual-continue`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        content,
+        review_note: reviewNote
+      })
+    },
+  );
+}
+
+export async function loadJob(jobId: string): Promise<JobStatus | null> {
+  return apiFetch<JobStatus>(`/api/jobs/${encodeURIComponent(jobId)}`);
+}
+
+export async function cancelJob(jobId: string): Promise<JobStatus> {
+  return apiWrite<JobStatus>(`/api/jobs/${encodeURIComponent(jobId)}/cancel`, {
+    method: "POST",
+    body: JSON.stringify({})
   });
 }

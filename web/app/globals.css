@@ -335,6 +335,12 @@ textarea {
   color: var(--ink);
 }
 
+.button:disabled,
+.button-secondary:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .mono {
   font-family: "SFMono-Regular", "Menlo", "Consolas", monospace;
 }
@@ -521,6 +527,25 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.event-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.event-item {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.event-name {
+  margin-bottom: 4px;
+  font-size: 0.78rem;
+  color: var(--muted);
 }
 
 .empty-note {
