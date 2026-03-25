@@ -164,6 +164,9 @@ def _run_summary(path: Path) -> dict[str, Any]:
     latest_step = None
     if current_chapter is not None:
         latest_step = _latest_step(data.get("chapters", {}).get(str(current_chapter), {}))
+    metrics = data.get("metrics", {}) if isinstance(data.get("metrics", {}), dict) else {}
+    total_tokens_in = int(metrics.get("total_tokens_in", 0) or 0)
+    total_tokens_out = int(metrics.get("total_tokens_out", 0) or 0)
 
     return {
         "run_id": run_id,
@@ -172,8 +175,14 @@ def _run_summary(path: Path) -> dict[str, Any]:
         "total_chapters": data.get("total_chapters"),
         "current_chapter": current_chapter,
         "latest_completed_step": latest_step,
+        "latest_step": latest_step,
         "updated_at": data.get("updated_at"),
         "created_at": data.get("created_at"),
+        "total_tokens": total_tokens_in + total_tokens_out,
+        "total_tokens_in": total_tokens_in,
+        "total_tokens_out": total_tokens_out,
+        "total_cost_usd": float(metrics.get("total_cost_usd", 0.0) or 0.0),
+        "total_word_count": int(metrics.get("total_word_count", 0) or 0),
     }
 
 

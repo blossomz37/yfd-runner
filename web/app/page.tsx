@@ -13,6 +13,8 @@ function formatDollars(value: number): string {
 export default async function RunsDashboardPage() {
   const runs = await loadRuns();
   const reviewCount = runs.filter((run) => run.latest_step === "draft" || run.latest_step === "final").length;
+  const currentFocus = runs[0]?.current_chapter ? `ch${String(runs[0].current_chapter).padStart(2, "0")}` : "idle";
+  const lastAction = runs[0]?.latest_step === "summary" ? "Build" : "Resume";
 
   return (
     <>
@@ -66,11 +68,11 @@ export default async function RunsDashboardPage() {
         </div>
         <div className="stat-card">
           <div className="metric-label">Current focus</div>
-          <div className="stat-value">ch03</div>
+          <div className="stat-value">{currentFocus}</div>
         </div>
         <div className="stat-card">
           <div className="metric-label">Last action</div>
-          <div className="stat-value">Resume</div>
+          <div className="stat-value">{lastAction}</div>
         </div>
       </section>
 
@@ -104,15 +106,15 @@ export default async function RunsDashboardPage() {
             <div className="metric-row">
               <div className="metric-box">
                 <div className="metric-label">Tokens</div>
-                <div className="metric-value">{run.total_tokens.toLocaleString()}</div>
+                <div className="metric-value">{run.metrics.total_tokens.toLocaleString()}</div>
               </div>
               <div className="metric-box">
                 <div className="metric-label">Cost</div>
-                <div className="metric-value">{formatDollars(run.total_cost_usd)}</div>
+                <div className="metric-value">{formatDollars(run.metrics.total_cost_usd)}</div>
               </div>
               <div className="metric-box">
                 <div className="metric-label">Words</div>
-                <div className="metric-value">{run.total_word_count.toLocaleString()}</div>
+                <div className="metric-value">{run.metrics.total_word_count.toLocaleString()}</div>
               </div>
             </div>
             <div className="row-between">

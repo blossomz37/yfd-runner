@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
 import { loadRuns } from "../lib/api";
+import { NavLink } from "./_components/nav-link";
 
 export const metadata: Metadata = {
   title: "YFD Studio",
@@ -38,9 +39,7 @@ export default async function RootLayout({
               </div>
               <div className="nav-group">
                 {NAV_ITEMS.map((item) => (
-                  <Link key={item.href} className={`nav-link${item.href === "/" ? " active" : ""}`} href={item.href}>
-                    <div className="nav-label">{item.label}</div>
-                  </Link>
+                  <NavLink key={item.href} href={item.href} label={item.label} />
                 ))}
               </div>
               <div className="stack">
@@ -71,11 +70,11 @@ export default async function RootLayout({
               <div className="rail-list">
                 <div className="list-item">
                   <div className="list-title">Open run</div>
-                  <div className="list-copy mono">partial_ch2_20260319</div>
+                  <div className="list-copy mono">{runs[0]?.run_id ?? "partial_ch2_20260319"}</div>
                 </div>
                 <div className="list-item">
                   <div className="list-title">Render prompt</div>
-                  <div className="list-copy mono">04-edit-style.j2 against chapter 03</div>
+                  <div className="list-copy mono">04-edit-style.j2 against {runs[0]?.run_id ?? "chapter 03"}</div>
                 </div>
                 <div className="list-item">
                   <div className="list-title">Build manuscript</div>
