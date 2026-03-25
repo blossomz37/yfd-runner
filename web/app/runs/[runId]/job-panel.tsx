@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { JobStatus } from "../../../lib/api";
 
 type JobPanelProps = {
@@ -9,44 +10,142 @@ type JobPanelProps = {
   cancelAction: (formData: FormData) => Promise<void>;
 };
 
+const SSE_EVENT_NAMES = [
+  "job_queued",
+  "job_started",
+  "job_finished",
+  "job_failed",
+  "job_cancelled",
+  "cancel_requested",
+  "step_started",
+  "prompt_rendered",
+  "attempt_started",
+  "attempt_succeeded",
+  "attempt_failed",
+  "attempt_event",
+  "warning",
+  "validation_failed",
+  "step_failed",
+  "step_succeeded"
+] as const;
+
 function terminal(status: string): boolean {
   return status === "succeeded" || status === "failed" || status === "cancelled";
 }
 
 export function JobPanel({ initialJob, runId, cancelAction }: JobPanelProps) {
+  const router = useRouter();
   const [job, setJob] = useState<JobStatus>(initialJob);
-  const [pollError, setPollError] = useState<string | null>(null);
+  const [transportError, setTransportError] = useState<string | null>(null);
+  const [sseConnected, setSseConnected] = useState(false);
+  const refreshTimeoutRef = useRef<number | null>(null);
+  const refreshInFlightRef = useRef(false);
+  const terminalRefreshRef = useRef<string | null>(null);
 
   useEffect(() => {
     setJob(initialJob);
-    setPollError(null);
+    setTransportError(null);
+    setSseConnected(false);
+    terminalRefreshRef.current = null;
   }, [initialJob]);
+
+  const refreshSnapshot = useCallback(
+    async (source: "sse" | "poll") => {
+      if (!job.job_id || refreshInFlightRef.current) {
+        return;
+      }
+      refreshInFlightRef.current = true;
+      try {
+        const response = await fetch(`/api/jobs/${encodeURIComponent(job.job_id)}`, {
+          cache: "no-store"
+        });
+        if (!response.ok) {
+          throw new Error(`Unable to refresh job status via ${source}.`);
+        }
+        const payload = (await response.json()) as JobStatus;
+        setJob(payload);
+        setTransportError(null);
+      } catch (error) {
+        setTransportError(error instanceof Error ? error.message : "Unable to refresh job status.");
+      } finally {
+        refreshInFlightRef.current = false;
+      }
+    },
+    [job.job_id],
+  );
+
+  const scheduleSnapshotRefresh = useCallback(
+    (delayMs = 200) => {
+      if (refreshTimeoutRef.current !== null) {
+        return;
+      }
+      refreshTimeoutRef.current = window.setTimeout(() => {
+        refreshTimeoutRef.current = null;
+        void refreshSnapshot("sse");
+      }, delayMs);
+    },
+    [refreshSnapshot],
+  );
 
   useEffect(() => {
     if (!job.job_id || terminal(job.status)) {
       return;
     }
 
-    const interval = window.setInterval(async () => {
-      try {
-        const response = await fetch(`/api/jobs/${encodeURIComponent(job.job_id)}`, {
-          cache: "no-store"
-        });
-        if (!response.ok) {
-          throw new Error("Unable to refresh job status.");
-        }
-        const payload = (await response.json()) as JobStatus;
-        setJob(payload);
-        setPollError(null);
-      } catch (error) {
-        setPollError(error instanceof Error ? error.message : "Unable to refresh job status.");
-      }
+    const eventSource = new EventSource(`/api/jobs/${encodeURIComponent(job.job_id)}/events`);
+
+    eventSource.onopen = () => {
+      setSseConnected(true);
+      setTransportError(null);
+    };
+
+    const handleEvent = () => {
+      scheduleSnapshotRefresh();
+    };
+    eventSource.onmessage = handleEvent;
+    SSE_EVENT_NAMES.forEach((eventName) => {
+      eventSource.addEventListener(eventName, handleEvent);
+    });
+
+    eventSource.onerror = () => {
+      setSseConnected(false);
+      setTransportError((current) => current ?? "Live stream unavailable. Falling back to polling.");
+    };
+
+    return () => {
+      eventSource.close();
+    };
+  }, [job.job_id, job.status, scheduleSnapshotRefresh]);
+
+  useEffect(() => {
+    if (!job.job_id || terminal(job.status) || sseConnected) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      void refreshSnapshot("poll");
     }, 2000);
 
     return () => {
       window.clearInterval(interval);
     };
-  }, [job.job_id, job.status]);
+  }, [job.job_id, job.status, refreshSnapshot, sseConnected]);
+
+  useEffect(() => {
+    if (!job.job_id || !terminal(job.status) || terminalRefreshRef.current === job.job_id) {
+      return;
+    }
+    terminalRefreshRef.current = job.job_id;
+    router.refresh();
+  }, [job.job_id, job.status, router]);
+
+  useEffect(() => {
+    return () => {
+      if (refreshTimeoutRef.current !== null) {
+        window.clearTimeout(refreshTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const recentEvents = useMemo(() => job.events.slice(-5).reverse(), [job.events]);
   const targetLabel = `${String(job.target.chapter ?? job.target.section_number ?? "run")} · ${String(job.target.step ?? "job")}`;
@@ -71,16 +170,20 @@ export function JobPanel({ initialJob, runId, cancelAction }: JobPanelProps) {
           <div className="list-title">Target</div>
           <div className="list-copy mono">{targetLabel}</div>
         </div>
+        <div className="list-item">
+          <div className="list-title">Transport</div>
+          <div className="list-copy">{sseConnected ? "live stream" : terminal(job.status) ? "settled" : "polling fallback"}</div>
+        </div>
         {job.error ? (
           <div className="list-item">
             <div className="list-title">Error</div>
             <div className="list-copy">{job.error}</div>
           </div>
         ) : null}
-        {pollError ? (
+        {transportError ? (
           <div className="list-item">
-            <div className="list-title">Polling</div>
-            <div className="list-copy">{pollError}</div>
+            <div className="list-title">Live updates</div>
+            <div className="list-copy">{transportError}</div>
           </div>
         ) : null}
         <div className="event-list">
