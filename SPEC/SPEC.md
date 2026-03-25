@@ -9,21 +9,23 @@
 **Project:** Web application for authoring, running, and inspecting the YFD pipeline  
 **Working name:** `YFD Studio`  
 **Repository root:** `.`  
-**Status:** Preliminary draft for iteration
+**Status:** Active product spec aligned to the shipped local app
 
 ---
 
 ## 1. Product Summary
 
-YFD Studio is a polished local-first web app that sits on top of the existing `yfd-runner` Python pipeline.
+YFD Studio is a local-first web app that sits on top of the existing `yfd-runner` Python pipeline.
 
-It should let a user:
+The current app already lets a user:
 - edit prompt templates in [`yfd-runner/templates`](../yfd-runner/templates)
 - edit model configs in [`yfd-runner/models`](../yfd-runner/models)
+- edit structured step settings and raw [`yfd-runner/config.yaml`](../yfd-runner/config.yaml)
 - inspect and edit run state in [`yfd-runner/state`](../yfd-runner/state)
+- create runs from worksheets and dossier text
 - launch cascade and chapter steps
-- watch run progress live
-- inspect rendered prompts, responses, metrics, and validation failures
+- watch run progress through a job panel with polling over the backend job stream
+- inspect rendered prompts, responses, metrics, validation failures, and manuscript artifacts
 
 The existing CLI runner remains the execution engine and source of truth. The web app is a control plane and editor layer, not a parallel implementation of the workflow.
 
@@ -101,20 +103,19 @@ The web app should reuse these modules directly where practical.
 - `Next.js`
 - TypeScript
 - App Router
-- `CodeMirror 6` for text editing
-- Tailwind or CSS modules for the first pass
-- SSE client for live run updates
+- App Router server actions for local write flows
+- lightweight client polling for active job status on the run detail page
 
 ### Backend
 
 - `FastAPI`
 - direct imports from `yfd-runner` modules where safe
 - background job manager for long-running steps
-- SSE endpoint for progress streaming
+- SSE-compatible job event endpoint backed by in-memory job records
 
 ### Why this architecture
 
-`FastAPI` matches the existing Python runner and avoids wrapping core logic in shell-only calls. `Next.js` is the fastest path to a polished application shell, routing, and good editor ergonomics. This split also keeps the product extensible if a database or remote deployment is needed later.
+`FastAPI` matches the existing Python runner and avoids wrapping core logic in shell-only calls. `Next.js` provides the app shell, server actions, and editor ergonomics needed for a local workstation tool. This split keeps the product extensible if a database or remote deployment is needed later.
 
 ---
 
@@ -139,7 +140,7 @@ Browser UI
 - The frontend requests a run action.
 - The backend creates a job record in memory.
 - The backend calls the existing runner logic directly, step by step.
-- Progress events are streamed to the frontend over SSE.
+- Progress events are exposed through a job event stream and polled job snapshots.
 - Outputs continue to be written to the existing files under `yfd-runner/`.
 
 ---
@@ -155,6 +156,7 @@ Browser UI
 - `Worksheets`
 - `Outputs`
 - `Settings`
+- `Config`
 
 ### Proposed layout
 
@@ -177,12 +179,13 @@ Actions:
 - resume run
 - open run detail
 - build manuscript
+- jump to worksheets or outputs for the selected run
 
-#### 8.1.1 Create Run Modal
+#### 8.1.1 Create Run Flow
 
 Shows:
 - run id input
-- worksheet file picker
+- worksheet input
 - model config selector
 - optional output directory picker
 
@@ -221,15 +224,21 @@ Behavior:
 
 Shows:
 - run metadata
-- chapter-by-chapter grid
+- chapter-by-chapter progress and current focus
 - per-step status for each chapter
-- recent call history
+- recent job events and active job state
 - current worksheet snapshot
+- run-scoped retrieval results when a search query is active
 
 Actions:
 - run a single step
 - run a full chapter
-- force rerun a step
+- run cascade once or auto
+- build manuscript
+- rerun a step with a steering note
+- approve a candidate
+- manually continue after an edit
+- branch the run
 - inspect failure output
 
 #### 8.3 Template Editor
@@ -262,7 +271,7 @@ Actions:
 #### 8.5 Worksheet Explorer
 
 Shows:
-- section list from `parse_sections`
+- run selector and section list parsed from worksheet headings
 - raw worksheet content
 - structured section view
 
@@ -274,33 +283,31 @@ Actions:
 #### 8.5.1 Intake Workspace
 
 Shows:
-- imported source files and pasted text blocks
-- detected input type and extraction summary
-- mapping between source material and worksheet destinations
-- unresolved fields or ambiguous mappings
+- worksheet run-creation controls
+- dossier text blocks and their labels
+- normalized intake summary and mapping preview
+- generated worksheet draft routed into the worksheet editor
 
 Actions:
-- upload files
-- paste raw text
-- normalize input through rule-based cleanup and narrow mapping heuristics
-- accept or edit proposed mappings
-- generate initial worksheet draft
+- create run from worksheet input
+- create project from dossier text
+- review imported blocks and generated mapping
+- continue into worksheet refinement
 
 #### 8.6 Output Inspector
 
 Shows:
-- rendered prompt
-- model response
-- validation result
-- metrics for the call
-- saved output for plan, draft, style, craft, final, or summary
+- run selector
+- manuscript content
+- rendered prompt and failure artifacts
+- validation result and artifact metadata
+- canonical vs candidate comparison for the same chapter and step
 
 Actions:
-- approve output
-- reject output
-- rerun output
-- rerun with steering note
-- edit output manually and continue
+- inspect manuscript output
+- inspect rendered or failure artifacts
+- compare canonical and candidate output
+- navigate back into run review surfaces
 
 #### 8.7 Comparison View
 
@@ -312,5 +319,17 @@ Shows:
 Actions:
 - mark preferred version
 - promote a branch as the new working run
+
+#### 8.8 Settings and Config
+
+Shows:
+- structured per-step settings
+- raw `config.yaml` editor
+- effective model assignment and override values
+
+Actions:
+- edit and save step settings
+- open raw config for advanced edits
+- validate YAML before save
 
 ---
