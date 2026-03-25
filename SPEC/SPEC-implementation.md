@@ -32,9 +32,9 @@ Requirements:
 - no concurrent writes to the same run state
 - event emission on every significant state transition
 
-### 11.2.1 Backend additions needed beyond the current CLI
+### 11.2.1 Backend additions beyond the current CLI
 
-The current runner already accepts a worksheet path when initializing a run, but the web product will need additional service-layer behavior:
+The current runner already accepts a worksheet path when initializing a run. The web product adds service-layer behavior for:
 - worksheet validation endpoint before run creation
 - explicit rejection of H1 headings in worksheet imports
 - persisted per-run output directory setting
@@ -135,115 +135,64 @@ Characteristics:
 
 ---
 
-## 13. Suggested v1 Scope
+## 13. Current Implementation Status
 
-### 13.0 Locked V1 Slice
+The app has moved beyond the original phased delivery outline. The current local implementation already includes:
 
-The first usable release must stay narrow enough to build cleanly.
-
-Locked v1 includes:
-- create run from worksheet file
-- create project from pasted/uploaded `.md` or `.txt` dossier material
+- FastAPI service layer in `server/`
+- Next.js frontend in `web/`
+- run creation from worksheet input
+- dossier intake from pasted or uploaded text/markdown blocks
 - worksheet validation including H1 rejection
-- template editor with prompt preview
-- model editor
-- structured step settings editor
-- run dashboard
+- template editing with prompt preview
+- model editing
+- structured step settings editing
+- raw `config.yaml` editing
+- run dashboard and run detail review surface
 - run branching
-- chapter auto-run and single-step run
-- live job stream
-- output inspector
-- manual review for `plan`, `draft`, and `final`
-- rerun with steering note
-- custom manuscript output directory
+- single-step execution, chapter auto-run, cascade execution, and manuscript build
+- review, rerun, manual continue, and cooperative job cancellation
+- worksheet section editing
+- output inspector with artifact browsing and canonical-vs-candidate comparison
+- single-run retrieval/search
 
-Locked out of v1 even if desirable:
+Intentionally simplified parts of the current implementation:
+
+- the job stream is SSE-compatible over in-memory job records rather than a full persisted event bus
+- the frontend uses lightweight polling and route refresh behavior rather than a browser-side SSE client
+- the frontend can render fallback read data when the backend is unavailable
+- dossier mapping is intentionally narrow and does not yet expose a rich interactive mapping editor
+
+## 14. Current Scope and Known Gaps
+
+Shipped core v1 surfaces:
+
+- runs
+- intake
+- templates
+- models
+- worksheets
+- outputs
+- settings
+- config editor
+
+Still intentionally deferred:
+
 - DOCX/PDF dossier import
 - branch promotion or merge semantics
-- full search across all runs
-- git-backed history UI
-- advanced analytics
-- compare more than two candidates at once
-
-Rationale:
-- this gives the user a complete prompt sequencer loop without forcing the first release to solve every authoring and experiment-management problem
-
-### Must ship
-
-- read/write templates
-- read/write model configs
-- read/write structured step settings
-- create run
-- create project from dossier or loose notes
-- branch an existing run
-- run one step
-- run one full chapter
-- run cascade auto
-- live job progress
-- output inspector
-- prompt preview
-- review and rerun controls
-- worksheet validation with H1 rejection
-- custom output directory for manuscript artifacts
-
-### Should ship if still on schedule
-
-- worksheet section editor
-- config editor for `config.yaml`
-- manuscript build trigger
-- failure artifact viewer
-- comparison view
-- run search
-
-### Explicitly defer
-
-- auth
-- multi-user presence
-- remote execution
-- git history UI
-- rich analytics dashboards
-- DOCX/PDF dossier import
-- branch merge/promotion semantics beyond metadata
 - cross-run global search
+- git-backed history UI
+- remote execution
+- auth and multi-user collaboration
+- rich analytics dashboards
+- comparison of more than two candidates at once
 
----
+Recommended near-term work:
 
-## 14. Suggested Delivery Phases
-
-### Phase 1: Backend wrapper
-
-- add FastAPI service
-- expose read APIs for runs, templates, models, and rendering
-- expose write APIs for templates and models
-- expose step execution endpoints
-- add worksheet validation service
-- add dossier intake service
-- add run branching endpoint
-- add structured step-settings endpoints
-
-### Phase 2: Core app shell
-
-- add Next.js app
-- implement navigation and run dashboard
-- implement create-project wizard
-- implement step settings panel
-- implement template editor
-- implement model editor
-
-### Phase 3: Live execution UX
-
-- add SSE job stream
-- show active step and status changes live
-- add output inspector
-- add review and rerun flow
-
-### Phase 4: Refinement
-
-- add worksheet editing
-- add config editor
-- add manuscript actions
-- add run branching and comparison
-- improve visual design and usability
+- improve browser-side live updates beyond route refresh and 2-second polling
+- deepen dossier mapping and review controls before worksheet generation
+- strengthen comparison ergonomics for branches and candidate outputs
+- tighten documentation and testing around fallback mode versus live backend mode
 
 ---
 
@@ -267,7 +216,7 @@ The app edits live files. Validation and guarded writes are mandatory to avoid b
 
 ### Spec drift vs current runner behavior
 
-The current runner does not explicitly reject H1 headings in worksheet imports, and the CLI does not expose custom output directories even though some underlying functions accept them. The web app will therefore require modest backend additions rather than a pure thin wrapper.
+The runner and the web app are intentionally close, but they are not identical surfaces. The web layer adds worksheet validation, run-scoped output directory handling, review metadata, and artifact browsing that do not exist as first-class CLI affordances.
 
 ### Intake ambiguity
 
@@ -288,12 +237,10 @@ Resolved in implementation:
 - V1 cancellation is cooperative at loop boundaries rather than mid-call interruption.
 
 Still open:
-- Should `config.yaml` be edited as raw YAML only, or also through a structured form UI?
 - Do we want template versioning inside the app in v1, or rely on git outside the app?
 - Should rendered prompt previews be read-only, or support ad hoc edits before manual execution?
 - Should the app expose raw state JSON anywhere, or keep all views structured?
 - Do we want a local desktop packaging target later, such as Tauri or Electron, or stay browser-plus-local-server only?
-- What is the minimal internal schema for imported dossier blocks before worksheet generation?
 - What is the promotion model when a branch is preferred over its parent?
 
 Resolved in this draft:
@@ -303,15 +250,15 @@ Resolved in this draft:
 
 ---
 
-## 17. Initial Recommendation
+## 17. Current Recommendation
 
-Build the first version as:
-- `FastAPI` backend in a new `server/` or `web-api/` directory
-- `Next.js` frontend in a new `web/` directory
-- direct integration with the current `yfd-runner` Python modules
+Keep the current shape:
+- `FastAPI` backend in `server/`
+- `Next.js` frontend in `web/`
+- direct integration with the existing `yfd-runner` modules
 - filesystem-backed persistence, no database in v1
 
-This is the shortest path to a polished product without undermining the runner that already works.
+The main priority is now refinement and documentation clarity rather than another architectural shift.
 
 ---
 
@@ -330,6 +277,8 @@ The first release is successful when a user can:
 - approve, reject, rerun, or manually continue a step from the UI
 - inspect the saved draft, style report, craft report, final chapter, and summary
 - recover from an interrupted run without touching the terminal
+
+Most of this definition is already met in the local build. The remaining work is mostly refinement, deeper intake ergonomics, and more polished live-update behavior.
 
 ---
 

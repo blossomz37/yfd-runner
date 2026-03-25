@@ -11,7 +11,7 @@
 
 ### 9.1 File Editing
 
-The app must support direct editing of:
+The app supports direct editing of:
 - template files under `templates/`
 - model YAML files under `models/`
 - config file [`yfd-runner/config.yaml`](../yfd-runner/config.yaml)
@@ -41,7 +41,7 @@ Failure behavior:
 
 ### 9.1.2 Story Dossier Intake
 
-The app must support project creation from semi-structured source material, not only prebuilt worksheets.
+The app supports project creation from semi-structured source material, not only prebuilt worksheets.
 
 Supported v1 dossier inputs:
 - pasted markdown or plain text
@@ -53,7 +53,7 @@ Deferred inputs:
 - PDF
 - web clipping and URL import
 
-The intake flow must support:
+Current v1 behavior:
 - source labeling such as `brain dump`, `synopsis`, `character notes`, `world notes`, `beat sheet`
 - text extraction into normalized internal blocks
 - user review before worksheet generation
@@ -74,11 +74,11 @@ Initial worksheet destinations include:
 - genre lens
 - chapter outline inputs
 
-The user must be able to:
-- accept the proposed mapping
-- edit the mapping
-- remove irrelevant source blocks
-- continue with a generated worksheet draft
+The user must be able to continue with a generated worksheet draft.
+
+Future refinement:
+- explicit mapping edits in the UI
+- removal or exclusion of irrelevant source blocks before generation
 
 ### 9.1.3.1 Locked V1 Dossier Target Taxonomy
 
@@ -197,9 +197,9 @@ V1 constraint:
 
 ### 9.2 Run Creation and Control
 
-The app must support:
+The app supports:
 - create new run from worksheet path
-- create new run from a file picker, not only manual path entry
+- create new run from worksheet text or path input
 - create new project from dossier inputs and convert it into a worksheet-backed run
 - start cascade for one section
 - auto-run remaining cascade sections
@@ -348,7 +348,7 @@ Then render the exact prompt using the existing renderer logic and display:
 
 ### 9.4.1 Structured Step Settings
 
-The app must expose per-step operational settings without requiring raw YAML editing.
+The app exposes per-step operational settings without requiring raw YAML editing.
 
 V1 minimum:
 - view effective step settings for each pipeline step
@@ -381,6 +381,11 @@ V1 minimum:
 - search within a single run
 - search results link directly to the relevant chapter and step
 
+Current implementation:
+- single-run search is available on the run detail surface
+- results cover worksheet text and chapter step outputs already loaded for that run
+- worksheet hits link into the worksheet editor; output hits refocus the run detail view
+
 ### 9.7 Comparison and Approval
 
 The app must support comparison and explicit choice between candidate outputs.
@@ -394,7 +399,7 @@ V1 minimum:
 
 ## 10. API Surface
 
-This is a preliminary API proposal, not a locked contract.
+This is the active local API surface for the current implementation, with some endpoints still representing target-state transport rather than fully push-based behavior.
 
 ### Read endpoints
 
@@ -444,6 +449,10 @@ Uses SSE and emits events such as:
 - `step_succeeded`
 - `step_failed`
 - `job_finished`
+
+Current implementation note:
+- the backend exposes an SSE-compatible event stream over in-memory job records
+- the frontend currently relies primarily on polled job snapshots and route refreshes rather than a browser-side SSE client
 
 ### 10.1 Locked V1 Endpoint Contracts
 
