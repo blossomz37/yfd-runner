@@ -17,29 +17,46 @@ Purpose: turn the locked v1 slice into an implementation-facing checklist.
 - added root `requirements.txt`
 - ignored local `.venv/`
 - pushed `main` to GitHub
-
-## In Progress
-
-### Backend wrapper
-
-- scaffold `server/`
-- expose read-only endpoints for:
+- scaffolded `server/`
+- exposed read-only endpoints for:
   - `GET /healthz`
   - `GET /api/runs`
   - `GET /api/runs/{runId}`
   - `GET /api/templates`
   - `GET /api/templates/{name}`
   - `GET /api/models`
+  - `GET /api/models/{name}`
+  - `GET /api/config`
   - `GET /api/render/step`
+  - `GET /api/render/cascade`
+- added write-safe endpoints for:
+  - `PUT /api/templates/{name}`
+  - `PUT /api/models/{name}`
+  - `PUT /api/config`
+  - `PUT /api/runs/{runId}/worksheet/{sectionKey}`
+  - `POST /api/runs`
+  - `POST /api/runs/{runId}/chapters/{chapter}/steps/{step}/approve`
+  - `POST /api/runs/{runId}/chapters/{chapter}/steps/{step}/manual-continue`
+- added worksheet validation with H1 rejection and structured validation errors
+- added candidate approval and manual-edit traceability through `studio.review_state` and `studio.candidate_outputs`
+
+## In Progress
+
+### Backend wrapper
+
+- stabilize the review and orchestration layer before frontend work
+- preserve runner-compatible canonical state while adding `studio` metadata
+- keep background job and live streaming work deferred until the contract settles
 
 ## Next
 
-### Backend write-safe endpoints
+### Backend orchestration
 
-- `PUT /api/templates/{name}`
-- `PUT /api/models/{name}`
-- `GET /api/config`
-- worksheet validation service
+- `POST /api/runs/{runId}/chapters/{chapter}/steps/{step}/rerun`
+- `POST /api/runs/{runId}/chapters/{chapter}/auto`
+- `POST /api/runs/{runId}/build-manuscript`
+- per-run output directory wrappers for render/manuscript tasks
+- active-job registry and conflict protection
 
 ### Frontend shell
 

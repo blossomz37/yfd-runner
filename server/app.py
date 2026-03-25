@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import JSONResponse
 
 from . import runner_bridge
 
@@ -10,6 +11,31 @@ app = FastAPI(title="YFD Studio API", version="0.1.0")
 
 class FileUpdateRequest(BaseModel):
     content: str
+
+
+class WorksheetValidationRequest(BaseModel):
+    worksheet_path: str
+
+
+class WorksheetSectionUpdateRequest(BaseModel):
+    content: str
+
+
+class CreateRunRequest(BaseModel):
+    run_id: str
+    worksheet_path: str
+    model_config_name: str | None = Field(default=None, alias="model_config")
+    output_dir: str | None = None
+    review_policy: dict[str, str] | None = None
+
+
+class StepApprovalRequest(BaseModel):
+    candidate_id: str
+
+
+class ManualContinueRequest(BaseModel):
+    content: str
+    review_note: str = ""
 
 
 @app.get("/healthz")
@@ -61,6 +87,22 @@ def get_config() -> dict[str, object]:
     return runner_bridge.get_config()
 
 
+@app.put("/api/config")
+def put_config(request: FileUpdateRequest) -> dict[str, object]:
+    try:
+        return runner_bridge.update_config(request.content)
+    except runner_bridge.BridgeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/validate/worksheet")
+def validate_worksheet(request: WorksheetValidationRequest):
+    try:
+        return runner_bridge.validate_worksheet_path(request.worksheet_path)
+    except runner_bridge.ValidationBridgeError as exc:
+        return JSONResponse(status_code=400, content={"status": "validation_error", "errors": exc.errors})
+
+
 @app.put("/api/templates/{name}")
 def put_template(name: str, request: FileUpdateRequest) -> dict[str, object]:
     try:
@@ -85,5 +127,68 @@ def render_step(
 ) -> dict[str, object]:
     try:
         return runner_bridge.render_step_preview(run_id=run_id, chapter=chapter, step=step)
+    except runner_bridge.BridgeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/render/cascade")
+def render_cascade(
+    run_id: str = Query(...),
+    section_number: int = Query(..., ge=1),
+) -> dict[str, object]:
+    try:
+        return runner_bridge.render_cascade_preview(run_id=run_id, section_number=section_number)
+    except runner_bridge.BridgeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/runs")
+def create_run(request: CreateRunRequest):
+    try:
+        return runner_bridge.create_run(
+            run_id=request.run_id,
+            worksheet_path=request.worksheet_path,
+            model_config=request.model_config_name,
+            output_dir=request.output_dir,
+            review_policy=request.review_policy,
+        )
+    except runner_bridge.ValidationBridgeError as exc:
+        return JSONResponse(status_code=400, content={"status": "validation_error", "errors": exc.errors})
+    except runner_bridge.BridgeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.put("/api/runs/{run_id}/worksheet/{section_key}")
+def put_worksheet_section(run_id: str, section_key: str, request: WorksheetSectionUpdateRequest):
+    try:
+        return runner_bridge.update_worksheet_section(run_id, section_key, request.content)
+    except runner_bridge.ValidationBridgeError as exc:
+        return JSONResponse(status_code=400, content={"status": "validation_error", "errors": exc.errors})
+    except runner_bridge.BridgeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/runs/{run_id}/chapters/{chapter}/steps/{step}/approve")
+def approve_step_candidate(run_id: str, chapter: int, step: str, request: StepApprovalRequest):
+    try:
+        return runner_bridge.approve_candidate(run_id, chapter, step, request.candidate_id)
+    except runner_bridge.ValidationBridgeError as exc:
+        return JSONResponse(status_code=400, content={"status": "validation_error", "errors": exc.errors})
+    except runner_bridge.BridgeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/runs/{run_id}/chapters/{chapter}/steps/{step}/manual-continue")
+def manual_continue_step(run_id: str, chapter: int, step: str, request: ManualContinueRequest):
+    try:
+        return runner_bridge.manual_continue(
+            run_id=run_id,
+            chapter=chapter,
+            step=step,
+            content=request.content,
+            review_note=request.review_note,
+        )
+    except runner_bridge.ValidationBridgeError as exc:
+        return JSONResponse(status_code=400, content={"status": "validation_error", "errors": exc.errors})
     except runner_bridge.BridgeError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

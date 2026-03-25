@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import yaml
 
@@ -16,10 +18,19 @@ if str(RUNNER_DIR) not in sys.path:
 
 import renderer as runner_renderer
 import state as runner_state
+import manuscript as runner_manuscript
 
 
 class BridgeError(Exception):
     """Raised when the service layer cannot fulfill a request."""
+
+
+class ValidationBridgeError(BridgeError):
+    """Raised when structured validation errors should be returned to the client."""
+
+    def __init__(self, errors: list[dict[str, str]]):
+        self.errors = errors
+        super().__init__("Validation failed")
 
 
 def _validate_relative_name(name: str, suffix: str) -> str:
@@ -36,8 +47,45 @@ def _write_text_atomic(path: Path, content: str) -> None:
     os.rename(tmp_path, path)
 
 
+def _display_path(path: Path) -> str:
+    try:
+        return str(path.relative_to(ROOT_DIR))
+    except ValueError:
+        return str(path)
+
+
+def _require_absolute_path(path_str: str, label: str) -> Path:
+    path = Path(path_str)
+    if not path.is_absolute():
+        raise ValidationBridgeError(
+            [
+                {
+                    "code": f"{label}_not_absolute",
+                    "message": f"{label.replace('_', ' ').capitalize()} must be an absolute path.",
+                }
+            ]
+        )
+    return path
+
+
+def _normalize_text_file(content: str) -> str:
+    return content if content.endswith("\n") else content + "\n"
+
+
 def _sorted_run_paths() -> list[Path]:
     return sorted(runner_state.STATE_DIR.glob("*.json"))
+
+
+def _normalize_step_name(step: str) -> str:
+    try:
+        return runner_renderer.normalize_step_name(step)
+    except Exception as exc:  # pragma: no cover - surfaced through API
+        raise BridgeError(str(exc)) from exc
+
+
+def _storage_step_name(step: str) -> str:
+    normalized = _normalize_step_name(step)
+    return "repetition_audit" if normalized == "repetition" else normalized
 
 
 def _chapter_numbers(run_data: dict[str, Any]) -> list[int]:
@@ -62,7 +110,7 @@ def _run_summary(path: Path) -> dict[str, Any]:
 
     return {
         "run_id": run_id,
-        "path": str(path.relative_to(ROOT_DIR)),
+        "path": _display_path(path),
         "project": data.get("project"),
         "total_chapters": data.get("total_chapters"),
         "current_chapter": current_chapter,
@@ -76,15 +124,18 @@ def list_runs() -> list[dict[str, Any]]:
     return [_run_summary(path) for path in _sorted_run_paths()]
 
 
-def get_run(run_id: str) -> dict[str, Any]:
+def _load_run_data(run_id: str) -> dict[str, Any]:
     try:
-        data = runner_state.load_state(run_id)
+        return runner_state.load_state(run_id)
     except Exception as exc:  # pragma: no cover - passed through as API 404/400
         raise BridgeError(str(exc)) from exc
 
+
+def get_run(run_id: str) -> dict[str, Any]:
+    data = _load_run_data(run_id)
     return {
         "run_id": run_id,
-        "state_path": str(runner_state.state_path(run_id).relative_to(ROOT_DIR)),
+        "state_path": _display_path(runner_state.state_path(run_id)),
         "data": data,
     }
 
@@ -95,7 +146,7 @@ def list_templates() -> list[dict[str, str]]:
         templates.append(
             {
                 "name": path.name,
-                "path": str(path.relative_to(ROOT_DIR)),
+                "path": _display_path(path),
             }
         )
     return templates
@@ -108,7 +159,7 @@ def get_template(name: str) -> dict[str, str]:
         raise BridgeError(f"Template not found: {name}")
     return {
         "name": path.name,
-        "path": str(path.relative_to(ROOT_DIR)),
+        "path": _display_path(path),
         "content": path.read_text(encoding="utf-8"),
     }
 
@@ -128,7 +179,7 @@ def update_template(name: str, content: str) -> dict[str, str]:
     except Exception as exc:  # pragma: no cover - surfaced through API
         raise BridgeError(f"Template validation failed: {exc}") from exc
 
-    normalized = content if content.endswith("\n") else content + "\n"
+    normalized = _normalize_text_file(content)
     _write_text_atomic(path, normalized)
     return get_template(safe_name)
 
@@ -139,7 +190,7 @@ def list_models() -> list[dict[str, str]]:
         models.append(
             {
                 "name": path.name,
-                "path": str(path.relative_to(ROOT_DIR)),
+                "path": _display_path(path),
             }
         )
     return models
@@ -162,7 +213,7 @@ def get_model(name: str) -> dict[str, Any]:
 
     return {
         "name": path.name,
-        "path": str(path.relative_to(ROOT_DIR)),
+        "path": _display_path(path),
         "content": content,
         "data": data,
     }
@@ -187,7 +238,7 @@ def update_model(name: str, content: str) -> dict[str, Any]:
     if not data.get("model"):
         raise BridgeError("Model YAML must define a non-empty 'model' field")
 
-    normalized = content if content.endswith("\n") else content + "\n"
+    normalized = _normalize_text_file(content)
     _write_text_atomic(path, normalized)
     return get_model(safe_name)
 
@@ -197,9 +248,424 @@ def get_config() -> dict[str, Any]:
     content = path.read_text(encoding="utf-8")
     data = runner_state.load_config(path)
     return {
-        "path": str(path.relative_to(ROOT_DIR)),
+        "path": _display_path(path),
         "content": content,
         "data": data,
+    }
+
+
+def update_config(content: str) -> dict[str, Any]:
+    if not content.strip():
+        raise BridgeError("Config content must not be empty")
+
+    try:
+        data = yaml.safe_load(content)
+    except yaml.YAMLError as exc:  # pragma: no cover - surfaced through API
+        raise BridgeError(f"Config validation failed: {exc}") from exc
+
+    if not isinstance(data, dict):
+        raise BridgeError("Config YAML must parse to a mapping")
+
+    normalized = _normalize_text_file(content)
+    _write_text_atomic(runner_state.CONFIG_PATH, normalized)
+    return get_config()
+
+
+def _ensure_studio(data: dict[str, Any]) -> dict[str, Any]:
+    studio = data.setdefault("studio", {})
+    if not isinstance(studio, dict):
+        raise BridgeError("Run studio state is invalid")
+    return studio
+
+
+def _ensure_review_state(data: dict[str, Any], chapter: int, step: str) -> dict[str, Any]:
+    studio = _ensure_studio(data)
+    review_state = studio.setdefault("review_state", {})
+    if not isinstance(review_state, dict):
+        raise BridgeError("Run studio.review_state is invalid")
+
+    chapter_key = str(chapter)
+    chapter_review = review_state.setdefault(chapter_key, {})
+    if not isinstance(chapter_review, dict):
+        raise BridgeError(f"Run review_state chapter bucket is invalid: {chapter_key}")
+
+    step_review = chapter_review.setdefault(step, {})
+    if not isinstance(step_review, dict):
+        raise BridgeError(f"Run review_state step bucket is invalid: chapter={chapter_key} step={step}")
+
+    return step_review
+
+
+def _ensure_candidate_outputs(data: dict[str, Any]) -> list[dict[str, Any]]:
+    studio = _ensure_studio(data)
+    candidate_outputs = studio.setdefault("candidate_outputs", [])
+    if not isinstance(candidate_outputs, list):
+        raise BridgeError("Run studio.candidate_outputs is invalid")
+    return candidate_outputs
+
+
+def _new_candidate_id() -> str:
+    return f"cand_{uuid4().hex[:12]}"
+
+
+def _validate_step_slot_exists(data: dict[str, Any], chapter: int, step: str) -> None:
+    if step == "plan":
+        return
+
+    chapter_bucket = data.get("chapters", {}).get(str(chapter))
+    if chapter_bucket is None:
+        raise ValidationBridgeError(
+            [
+                {
+                    "code": "chapter_not_found",
+                    "message": f"Chapter does not exist for this run: {chapter}",
+                }
+            ]
+        )
+
+
+def _run_output_dir_from_data(data: dict[str, Any]) -> Path | None:
+    studio = data.get("studio", {})
+    if not isinstance(studio, dict):
+        return None
+
+    run_settings = studio.get("run_settings", {})
+    if not isinstance(run_settings, dict):
+        return None
+
+    output_dir = run_settings.get("output_dir")
+    if not output_dir:
+        return None
+    return Path(str(output_dir))
+
+
+def _sync_summary_and_manuscript_if_needed(run_id: str, step: str) -> dict[str, Any] | None:
+    if step != "summary":
+        return None
+
+    updated = runner_state.rebuild_chapter_summaries(run_id)
+    output_dir = _run_output_dir_from_data(updated)
+    runner_manuscript.build_manuscript(run_id, output_dir=output_dir)
+    return updated
+
+
+def validate_worksheet_path(worksheet_path: str) -> dict[str, Any]:
+    path = _require_absolute_path(worksheet_path, "worksheet_path")
+
+    if not path.exists() or not path.is_file():
+        return {
+            "ok": False,
+            "errors": [
+                {
+                    "code": "worksheet_not_found",
+                    "message": f"Worksheet file does not exist: {path}",
+                }
+            ],
+        }
+
+    try:
+        content = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        return {
+            "ok": False,
+            "errors": [
+                {
+                    "code": "worksheet_unreadable",
+                    "message": f"Worksheet file could not be read: {exc}",
+                }
+            ],
+        }
+
+    return validate_worksheet_text(content)
+
+
+def render_cascade_preview(run_id: str, section_number: int) -> dict[str, Any]:
+    try:
+        rendered = runner_renderer.render_cascade(run_id, section_number)
+    except Exception as exc:  # pragma: no cover - passed through as API 400
+        raise BridgeError(str(exc)) from exc
+
+    return {
+        "run_id": run_id,
+        "section_number": section_number,
+        "template_name": runner_renderer.template_name_for_step("cascade"),
+        "rendered": rendered,
+    }
+
+
+def create_run(
+    run_id: str,
+    worksheet_path: str,
+    model_config: str | None = None,
+    output_dir: str | None = None,
+    review_policy: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    run_id = run_id.strip()
+    if not run_id:
+        raise ValidationBridgeError(
+            [{"code": "run_id_required", "message": "run_id is required."}]
+        )
+
+    validation = validate_worksheet_path(worksheet_path)
+    if not validation["ok"]:
+        raise ValidationBridgeError(validation["errors"])
+
+    state_file = runner_state.state_path(run_id)
+    if state_file.exists():
+        raise ValidationBridgeError(
+            [{"code": "run_id_exists", "message": f"Run already exists: {run_id}"}]
+        )
+
+    output_path_value: str | None = None
+    if output_dir is not None:
+        output_path_value = str(_require_absolute_path(output_dir, "output_dir"))
+
+    try:
+        runner_state.initialize_run(run_id, worksheet_path, model_config=model_config)
+        runner_state.update_state(
+            run_id,
+            lambda data: data.update(
+                {
+                    "studio": {
+                        "run_settings": {
+                            "output_dir": output_path_value,
+                            "review_policy": review_policy or {},
+                            "default_steering_note": "",
+                            "created_from": "worksheet",
+                        }
+                    }
+                }
+            ),
+        )
+    except ValidationBridgeError:
+        raise
+    except Exception as exc:  # pragma: no cover - surfaced through API
+        raise BridgeError(str(exc)) from exc
+
+    return {
+        "run_id": run_id,
+        "status": "created",
+        "worksheet_validation": validation,
+        "state_path": _display_path(runner_state.state_path(run_id)),
+    }
+
+
+def update_worksheet_section(run_id: str, section_key: str, content: str) -> dict[str, Any]:
+    data = _load_run_data(run_id)
+    normalized = content.strip()
+    if not normalized:
+        raise ValidationBridgeError(
+            [{"code": "content_required", "message": "Worksheet section content must not be empty."}]
+        )
+
+    try:
+        sections = runner_state.parse_sections(data.get("worksheet", ""))
+    except Exception as exc:  # pragma: no cover - surfaced through API
+        raise BridgeError(str(exc)) from exc
+
+    existing = next((section for section in sections if section["section_key"] == section_key), None)
+    if existing is None:
+        raise ValidationBridgeError(
+            [{"code": "section_not_found", "message": f"Worksheet section not found: {section_key}"}]
+        )
+
+    heading = f"## {section_key}"
+    new_section_text = normalized if normalized.startswith("## ") else f"{heading}\n\n{normalized}"
+    candidate_sections = []
+    for section in sections:
+        if section["section_key"] == section_key:
+            candidate_sections.append({**section, "text": new_section_text})
+        else:
+            candidate_sections.append(section)
+
+    next_worksheet = runner_state.join_sections(candidate_sections, data.get("worksheet", ""))
+    validation = validate_worksheet_text(next_worksheet)
+    if not validation["ok"]:
+        raise ValidationBridgeError(validation["errors"])
+
+    try:
+        runner_state.save_worksheet_section(run_id, section_key, new_section_text)
+    except Exception as exc:  # pragma: no cover - surfaced through API
+        raise BridgeError(str(exc)) from exc
+
+    return {
+        "run_id": run_id,
+        "section_key": section_key,
+        "status": "saved",
+        "worksheet_validation": validation,
+    }
+
+
+def _candidate_record(
+    *,
+    chapter: int,
+    step: str,
+    source: str,
+    content: str,
+    steering_note: str = "",
+    status: str = "candidate",
+    review_note: str = "",
+) -> dict[str, Any]:
+    record = {
+        "candidate_id": _new_candidate_id(),
+        "chapter": chapter,
+        "step": step,
+        "source": source,
+        "steering_note": steering_note,
+        "content": content,
+        "status": status,
+        "created_at": runner_state.now_iso(),
+    }
+    if review_note:
+        record["review_note"] = review_note
+    return record
+
+
+def manual_continue(
+    run_id: str,
+    chapter: int,
+    step: str,
+    content: str,
+    review_note: str = "",
+) -> dict[str, Any]:
+    storage_step = _storage_step_name(step)
+    _load_run_data(run_id)
+
+    normalized_content = content.strip()
+    if not normalized_content:
+        raise ValidationBridgeError(
+            [{"code": "content_required", "message": "Step content must not be empty."}]
+        )
+
+    candidate = _candidate_record(
+        chapter=chapter,
+        step=storage_step,
+        source="manual_edit",
+        content=normalized_content,
+        status="approved",
+        review_note=review_note.strip(),
+    )
+    reviewed_at = runner_state.now_iso()
+
+    def mutator(data: dict[str, Any]) -> None:
+        bucket = data.setdefault("chapters", {}).setdefault(str(chapter), {})
+        if not isinstance(bucket, dict):
+            raise BridgeError(f"Chapter bucket is invalid: {chapter}")
+        bucket[storage_step] = normalized_content
+
+        candidate_outputs = _ensure_candidate_outputs(data)
+        candidate_outputs.append(candidate)
+
+        step_review = _ensure_review_state(data, chapter, storage_step)
+        step_review.update(
+            {
+                "review_required": False,
+                "review_reason": "manual",
+                "review_status": "approved",
+                "approved_candidate_id": candidate["candidate_id"],
+                "last_reviewed_at": reviewed_at,
+            }
+        )
+
+    runner_state.update_state(run_id, mutator)
+    _sync_summary_and_manuscript_if_needed(run_id, storage_step)
+
+    return {
+        "run_id": run_id,
+        "chapter": chapter,
+        "step": storage_step,
+        "candidate_id": candidate["candidate_id"],
+        "status": "saved",
+    }
+
+
+def approve_candidate(run_id: str, chapter: int, step: str, candidate_id: str) -> dict[str, Any]:
+    data = _load_run_data(run_id)
+    storage_step = _storage_step_name(step)
+    _validate_step_slot_exists(data, chapter, storage_step)
+
+    studio = data.get("studio", {})
+    if not isinstance(studio, dict):
+        raise ValidationBridgeError(
+            [{"code": "candidate_not_found", "message": f"Candidate not found: {candidate_id}"}]
+        )
+
+    candidate_outputs = studio.get("candidate_outputs", [])
+    if not isinstance(candidate_outputs, list):
+        raise ValidationBridgeError(
+            [{"code": "candidate_not_found", "message": f"Candidate not found: {candidate_id}"}]
+        )
+
+    target = next(
+        (
+            candidate
+            for candidate in candidate_outputs
+            if isinstance(candidate, dict) and candidate.get("candidate_id") == candidate_id
+        ),
+        None,
+    )
+    if target is None:
+        raise ValidationBridgeError(
+            [{"code": "candidate_not_found", "message": f"Candidate not found: {candidate_id}"}]
+        )
+
+    if target.get("chapter") != chapter or target.get("step") != storage_step:
+        raise ValidationBridgeError(
+            [
+                {
+                    "code": "candidate_mismatch",
+                    "message": "Candidate does not belong to the requested run, chapter, and step.",
+                }
+            ]
+        )
+
+    candidate_content = str(target.get("content", "")).strip()
+    if not candidate_content:
+        raise ValidationBridgeError(
+            [
+                {
+                    "code": "candidate_empty",
+                    "message": f"Candidate content is empty: {candidate_id}",
+                }
+            ]
+        )
+
+    reviewed_at = runner_state.now_iso()
+
+    def mutator(updated: dict[str, Any]) -> None:
+        bucket = updated.setdefault("chapters", {}).setdefault(str(chapter), {})
+        if not isinstance(bucket, dict):
+            raise BridgeError(f"Chapter bucket is invalid: {chapter}")
+        bucket[storage_step] = candidate_content
+
+        outputs = _ensure_candidate_outputs(updated)
+        for candidate in outputs:
+            if not isinstance(candidate, dict):
+                continue
+            if candidate.get("chapter") != chapter or candidate.get("step") != storage_step:
+                continue
+            candidate["status"] = "approved" if candidate.get("candidate_id") == candidate_id else "rejected"
+
+        step_review = _ensure_review_state(updated, chapter, storage_step)
+        step_review.update(
+            {
+                "review_required": False,
+                "review_reason": step_review.get("review_reason", "manual"),
+                "review_status": "approved",
+                "approved_candidate_id": candidate_id,
+                "last_reviewed_at": reviewed_at,
+            }
+        )
+
+    runner_state.update_state(run_id, mutator)
+    _sync_summary_and_manuscript_if_needed(run_id, storage_step)
+
+    return {
+        "run_id": run_id,
+        "chapter": chapter,
+        "step": storage_step,
+        "approved_candidate_id": candidate_id,
+        "status": "approved",
     }
 
 
@@ -218,3 +684,37 @@ def render_step_preview(run_id: str, chapter: int, step: str) -> dict[str, Any]:
         "template_name": template_name,
         "rendered": rendered,
     }
+
+
+def validate_worksheet_text(content: str) -> dict[str, Any]:
+    errors: list[dict[str, str]] = []
+
+    if re.search(r"(?m)^#\s+", content):
+        errors.append(
+            {
+                "code": "worksheet_h1_detected",
+                "message": "Worksheet contains H1 headings. Top-level sections must use H2 (`##`).",
+            }
+        )
+
+    try:
+        runner_state.parse_sections(content)
+    except Exception as exc:
+        errors.append(
+            {
+                "code": "worksheet_section_parse_failed",
+                "message": str(exc),
+            }
+        )
+
+    try:
+        runner_state.extract_required_data_layer(content)
+    except Exception as exc:
+        errors.append(
+            {
+                "code": "worksheet_required_data_layer_invalid",
+                "message": str(exc),
+            }
+        )
+
+    return {"ok": not errors, "errors": errors}
