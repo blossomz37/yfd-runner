@@ -34,17 +34,17 @@ The runner only handles one chapter at a time (`--chapter N --auto`). The spec d
 
 **Recommendation:** Add a `POST /api/runs/{runId}/auto` endpoint that loops from the current chapter through the total, respecting review gates. The `queue_chapter_auto_run` worker pattern already exists and could be wrapped in an outer loop.
 
-### 2. The `from-dossier` endpoint has no implementation
+### 2. The `from-dossier` endpoint has no implementation *(confirmed V1)*
 
 `POST /api/projects/from-dossier` is specified with full request/response contracts (Section 10.1), listed in the locked V1 slice, but is absent from both `app.py` and `runner_bridge.py`. The `Intake Workspace` screen (Section 8.5.1) depends on it.
 
-**Recommendation:** Either implement the endpoint or explicitly move it to the "next" column in V1-BACKLOG.md. Right now the spec and backlog disagree about what's shipped.
+**Decision:** Dossier intake is confirmed as V1 scope. The endpoint and intake wizard must be implemented before V1 ships. This is likely the largest remaining backend work item — it requires a normalization service, the mapping logic from Section 9.1.3.1, and the `studio.dossier_blocks` persistence layer.
 
-### 3. Run branching has no implementation
+### 3. Run branching has no implementation *(confirmed V1)*
 
-`POST /api/runs/{runId}/branch` is in the API surface and the `studio.branch` data model is defined, but there's no implementation in the bridge. The spec lists branching as "should ship if still on schedule" but the V1 slice includes "rerun with steering note" and comparison view — both of which lose significant value without branching.
+`POST /api/runs/{runId}/branch` is in the API surface and the `studio.branch` data model is defined, but there's no implementation in the bridge.
 
-**Recommendation:** Clarify whether branching is V1 or not. If yes, it's a straightforward state-copy operation and should be quick to implement. If no, remove it from the API surface and data model to avoid spec drift.
+**Decision:** Run branching is confirmed as V1 scope. This is a straightforward state-copy operation: deep-copy the source run's JSON, assign a new run ID, record parent lineage in `studio.branch`, and write the new state file. The comparison view (Section 8.7) and "rerun with steering note" both gain significant value with branching in place.
 
 ### 4. Search is underspecified
 
@@ -110,11 +110,11 @@ The `SPEC-CSS-MOCKUPS-v2.md` brief references four screens (Runs Dashboard, Run 
 
 ## Scope Risks for V1
 
-**The intake flow is the biggest scope risk.** Dossier import, normalization, mapping, and user confirmation (Sections 9.1.2–9.1.3.1) is a substantial feature with AI-assisted extraction, user-editable mappings, and a multi-step wizard. If the primary use case is "I already have a worksheet," this can be deferred entirely without blocking core value. If it's "I have loose notes and want the pipeline to help me start," it's essential but will eat significant frontend time.
+**The intake flow is the biggest scope risk.** Dossier import, normalization, mapping, and user confirmation (Sections 9.1.2–9.1.3.1) is a substantial feature with AI-assisted extraction, user-editable mappings, and a multi-step wizard. This is confirmed V1, so the risk must be managed through tight scoping of the normalization layer (rule-based only, no AI extraction in V1) and keeping the frontend wizard minimal — upload/paste, label, confirm mapping, generate worksheet.
 
-**The comparison view is the second risk.** Side-by-side diff of two outputs with metadata comparison (Section 8.7) requires a diff rendering component, candidate selection UI, and promotion logic. The backend pieces exist (candidate outputs, approval), but the frontend work is non-trivial.
+**The comparison view is the second risk.** Side-by-side diff of two outputs with metadata comparison (Section 8.7) requires a diff rendering component, candidate selection UI, and promotion logic. With branching now confirmed V1, comparison becomes more valuable but also more work — the UI needs to show lineage and allow promotion of a branch as the working run.
 
-**Recommendation:** Ship V1 with the worksheet-creation path and single-candidate review flow. Dossier intake and comparison view can follow as V1.1 without breaking the architecture.
+**Recommendation:** Sequence dossier intake and branching as backend-first work items so the frontend can build against real endpoints. Keep the comparison view simple for V1 — two-candidate side-by-side with a "promote" button, no inline diff rendering.
 
 ---
 
@@ -135,4 +135,4 @@ The following areas are well-specified enough to start frontend implementation i
 
 ## Summary
 
-The spec is strong. The backend is substantially ahead of the frontend. The main risks are scope creep from intake and comparison features, and a few gaps where the spec describes behavior that isn't implemented (dossier, branching, search, cancellation). The architecture is sound and the data model choices are good. The next high-value move is standing up the frontend shell and wiring it to the endpoints that already exist.
+The spec is strong. The backend is substantially ahead of the frontend. With dossier intake and run branching confirmed as V1, the remaining backend work is: `from-dossier` endpoint + normalization service, branch state-copy endpoint, and structured step-settings endpoints. Cancellation is landed. The architecture is sound and the data model choices are good. The next high-value moves are landing the remaining backend endpoints and then standing up the frontend shell against the complete API surface.
