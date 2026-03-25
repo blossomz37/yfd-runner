@@ -5,6 +5,7 @@ distributed/
 .archive/
 .vscode/
 .env
+.venv/
 
 # macOS filesystem noise
 .DS_Store
